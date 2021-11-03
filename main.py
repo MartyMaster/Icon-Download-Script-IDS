@@ -9,7 +9,7 @@ from typing import Type
 
 def download():
     url = build_url()
-    urllib.request.urlretrieve(url, "download4.grib2.bz2")
+    urllib.request.urlretrieve(url, "download.grib2.bz2")
 
 
 def build_url():
