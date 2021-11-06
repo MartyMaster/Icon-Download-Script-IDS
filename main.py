@@ -25,12 +25,12 @@ def build_url():                                    # Assumption: the latest mod
 
 def get_latest_model_date():
     model_date = round_down_time()[0]       # use only first return, which is rounded_time
-    return (model_date[0:8])                # use only first 8 characters, ie the date
+    return model_date[0:8]                # use only first 8 characters, ie the date
 
 
 def get_latest_model_hour():
     model_hour = round_down_time()[0]       # use only first return, which is rounded_time
-    return (model_hour[9:11])               # use only characters 9 and 10, ie the hour
+    return model_hour[9:11]               # use only characters 9 and 10, ie the hour
 
 
 def get_forecast_time():
@@ -48,9 +48,9 @@ def round_down_time():
     else:
         rounder = 2
     rounded_time = str(actual_time.replace(microsecond=0, second=0, minute=0) - timedelta(hours=rounder))
-    rounded_time = rounded_time.replace("-","")
-    rounded_time = rounded_time.replace(":","")
-    return (rounded_time, rounder)
+    rounded_time = rounded_time.replace("-", "")
+    rounded_time = rounded_time.replace(":", "")
+    return rounded_time, rounder
 
 
 def get_modellevel():
@@ -61,7 +61,7 @@ def get_variable():
     return "u"
 
 
-#def unzip_file():
+# def unzip_file():
 
 
 if __name__ == '__main__':
@@ -72,5 +72,3 @@ if __name__ == '__main__':
     print(get_latest_model_date())
     print(get_latest_model_hour())
     print(get_forecast_time())
-
-
