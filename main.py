@@ -6,7 +6,7 @@ import bz2
 import pandas as pd
 import os
 import sys
-import eccodes
+import eccodes_get_nearest
 
 
 #################################       # Assumption: the latest model will give the most accurate forecast
@@ -14,16 +14,16 @@ import eccodes
 #################################
 
 
-def download():
-    url = build_url()
+def download(altitude):
+    url = build_url(altitude)
     urllib.request.urlretrieve(url, "ICON.grib2.bz2")
 
 
-def build_url():
+def build_url(altitude):
     date = get_latest_model_date()
     hour = get_latest_model_hour()
     forecast_time = get_forecast_time()
-    modellevel = get_modellevel()
+    modellevel = get_modellevel_from_altitude(altitude)
     variable = get_variable()
 
     url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/{variable}" \
@@ -87,6 +87,9 @@ def get_elevation(lat, long):                   # function for returning elevati
 
     return elevation
 
+#def get_elevation_from_hsurf(lat, long):
+
+
 
 def download_HHL():
     date = get_latest_model_date()
@@ -98,20 +101,32 @@ def download_HHL():
 
         unzip_file(f"HHL_level_{i}.grib2.bz2")
 
-    # do something with these 66 files
 
-    for i in range(1, 67):
-        os.remove(os.path.join(sys.path[0], f"HHL_level_{i}.grib2"))
+    #for i in range(1, 67):
+    #    os.remove(os.path.join(sys.path[0], f"HHL_level_{i}.grib2"))
 
 
-def get_modellevel():
-    elev = get_elevation(47.499014140583185, 8.706962639086678)
-    altitude = 3000
-    height = altitude - elev
+def get_modellevel_from_altitude(altitude):
 
-    print(height)
+    HHLs = []                                       # List of altitudes of all halflevels
+    HFLs = []                                       # List of altitudes of all fulllevels
 
-    return "1"
+    for i in range(1, 67):                          # Get values for all halflevels
+        HHL = eccodes_get_nearest.main(f"HHL_level_{i}.grib2", 51.71327675049083, 3.3868447313078023)
+        HHLs.append(HHL)
+        #alt_of_full_lvl = HHL
+        #print(alt_of_full_lvl)
+    print(HHLs)
+
+    for i in range(0, 65):                          # Calculate fulllevels from halflevels
+        HFL = (HHLs[i] + HHLs[i+1])/2
+        HFLs.append(HFL)
+    print(HFLs)
+
+    level = min(range(len(HFLs)), key=lambda i: abs(HFLs[i] - altitude)) + 1
+
+    print(level)
+    return level
 
 
 def get_variable():
@@ -147,8 +162,14 @@ def unzip_file(file):
 #             Main              #
 #################################
 
-if __name__ == '__main__':
-    #eccodes_get_nearest()
-    download()
+
+def main():
+    get_modellevel_from_altitude(1100)
+    #download()
     #unzip_file("ICON.grib2.bz2")
-    download_HHL()
+    #download_HHL()
+
+
+
+if __name__ == '__main__':
+    sys.exit(main())
