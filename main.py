@@ -14,17 +14,19 @@ import eccodes_get_nearest
 #################################
 
 
-def download(altitude):
-    url = build_url(altitude)
-    urllib.request.urlretrieve(url, "ICON.grib2.bz2")
+def download(lvl, var):
+    url = build_url(lvl, var)
+    urllib.request.urlretrieve(url, f"ICON_{var}.grib2.bz2")
+
+    unzip_file(f"ICON_{var}.grib2.bz2")
 
 
-def build_url(altitude):
+def build_url(lvl, var):
     date = get_latest_model_date()
     hour = get_latest_model_hour()
     forecast_time = get_forecast_time()
-    modellevel = get_modellevel_from_altitude(altitude)
-    variable = get_variable()
+    modellevel = lvl
+    variable = var
 
     url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/{variable}" \
           f"/icon-d2_germany_regular-lat-lon_model-level_{date}{hour}_{forecast_time}_{modellevel}_{variable}.grib2.bz2"
@@ -70,28 +72,25 @@ def round_down_time():                         # Takes current UTC and rounds do
 #################################
 
 
-def get_elevation(lat, long):                   # function for returning elevation from lat, long, based on open elevation data, which in turn is based on SRTM
-    query = ('https://api.open-elevation.com/api/v1/lookup'
-             f'?locations={lat},{long}')
+def get_modellevel_from_altitude(lat, lon, alt):
 
-    r = requests.get(query).json()
-    elevation = pd.json_normalize(r, 'results')['elevation'].values[0]
+    HHLs = []                                       # List of altitudes of all halflevels
+    HFLs = []                                       # List of altitudes of all fulllevels
 
-    date = get_latest_model_date()
-    hour = get_latest_model_hour()
+    for i in range(1, 67):                          # Get values for all halflevels
+        HHL = read_value_from_gribfile(f"HHL_level_{i}.grib2", lat, lon)
+        HHLs.append(HHL)
 
-    url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/hsurf/icon-d2_germany_regular-lat-lon_time-invariant_{date}{hour}_000_0_hsurf.grib2.bz2"
-    urllib.request.urlretrieve(url, f"hsurf.grib2.bz2")
+    for i in range(0, 65):                          # Calculate fulllevels from halflevels
+        HFL = (HHLs[i] + HHLs[i+1])/2
+        HFLs.append(HFL)
 
-    unzip_file(f"hsurf.grib2.bz2")
+    level = min(range(len(HFLs)), key=lambda i: abs(HFLs[i] - alt)) + 1
 
-    return elevation
-
-#def get_elevation_from_hsurf(lat, long):
+    return level
 
 
-
-def download_HHL():
+def download_HHL():                                 # This function should only be executed once at the beginning. The HHL_level files are stored locally and can be accessed anytime
     date = get_latest_model_date()
     hour = get_latest_model_hour()
 
@@ -105,32 +104,6 @@ def download_HHL():
     #for i in range(1, 67):
     #    os.remove(os.path.join(sys.path[0], f"HHL_level_{i}.grib2"))
 
-
-def get_modellevel_from_altitude(altitude):
-
-    HHLs = []                                       # List of altitudes of all halflevels
-    HFLs = []                                       # List of altitudes of all fulllevels
-
-    for i in range(1, 67):                          # Get values for all halflevels
-        HHL = eccodes_get_nearest.main(f"HHL_level_{i}.grib2", 51.71327675049083, 3.3868447313078023)
-        HHLs.append(HHL)
-        #alt_of_full_lvl = HHL
-        #print(alt_of_full_lvl)
-    print(HHLs)
-
-    for i in range(0, 65):                          # Calculate fulllevels from halflevels
-        HFL = (HHLs[i] + HHLs[i+1])/2
-        HFLs.append(HFL)
-    print(HFLs)
-
-    level = min(range(len(HFLs)), key=lambda i: abs(HFLs[i] - altitude)) + 1
-
-    print(level)
-    return level
-
-
-def get_variable():
-    return "u"
 
 
 #################################
@@ -155,7 +128,9 @@ def unzip_file(file):
 #           Reading             #
 #################################
 
-# read grib2-file with ecCodes
+def read_value_from_gribfile(file, lat, lon):
+        value = eccodes_get_nearest.main(file , lat, lon)
+        return value
 
 
 #################################
@@ -164,10 +139,18 @@ def unzip_file(file):
 
 
 def main():
-    get_modellevel_from_altitude(1100)
-    #download()
-    #unzip_file("ICON.grib2.bz2")
-    #download_HHL()
+    lat = 51.71327675049083
+    lon = 3.3868447313078023
+    alt = 1000
+
+    lvl = get_modellevel_from_altitude(lat, lon, alt)
+
+    variables_of_interest = ["t", "p", "qv", "u", "v", "w"]
+
+    for var in variables_of_interest:
+        download(lvl, var)
+        value = read_value_from_gribfile(f"ICON_{var}.grib2", lat, lon)
+        print(f"{var} = ", value)
 
 
 
