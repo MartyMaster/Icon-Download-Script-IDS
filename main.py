@@ -1,15 +1,13 @@
 import urllib.request
-import requests
 import datetime
 from datetime import datetime, timedelta
 import bz2
-import pandas as pd
 import os
 import sys
 import eccodes_get_nearest
 
 
-#################################       # Assumption: the latest model will give the most accurate forecast
+#################################                   # Assumption: the latest model will give the most accurate forecast
 #          Download             #
 #################################
 
@@ -85,7 +83,7 @@ def get_modellevel_from_altitude(lat, lon, alt):
         HFL = (HHLs[i] + HHLs[i+1])/2
         HFLs.append(HFL)
 
-    level = min(range(len(HFLs)), key=lambda i: abs(HFLs[i] - alt)) + 1
+    level = min(range(len(HFLs)), key=lambda i: abs(HFLs[i] - alt)) + 1         # Returns the fulllevel which is closest to the given altitude
 
     return level
 
@@ -96,14 +94,13 @@ def download_HHL():                                 # This function should only 
 
     for i in range(1, 67):
         url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/hhl/icon-d2_germany_regular-lat-lon_time-invariant_{date}{hour}_000_{i}_hhl.grib2.bz2"
+        print(url)
         urllib.request.urlretrieve(url, f"HHL_level_{i}.grib2.bz2")
 
         unzip_file(f"HHL_level_{i}.grib2.bz2")
 
-
-    #for i in range(1, 67):
+    # for i in range(1, 67):
     #    os.remove(os.path.join(sys.path[0], f"HHL_level_{i}.grib2"))
-
 
 
 #################################
@@ -121,7 +118,7 @@ def unzip_file(file):
 
     open(newfilepath, 'wb').write(data)             # write an uncompressed file
 
-    os.remove(filepath)                             #remove the compressed file directly
+    os.remove(filepath)                             # remove the compressed file directly
 
 
 #################################
@@ -129,8 +126,21 @@ def unzip_file(file):
 #################################
 
 def read_value_from_gribfile(file, lat, lon):
-        value = eccodes_get_nearest.main(file , lat, lon)
-        return value
+
+    value = eccodes_get_nearest.main(file, lat, lon)
+    return value
+
+
+#################################               # not used
+#         ICON Switcher         #
+#################################
+
+def icon_switcher(switcher):
+
+    if switcher == "D2":
+        return "icon-d2", "icon-d2_germany", 65
+    elif switcher == "EU":
+        return "icon-eu", "icon-eu_europe", 60
 
 
 #################################
@@ -139,19 +149,29 @@ def read_value_from_gribfile(file, lat, lon):
 
 
 def main():
-    lat = 51.71327675049083
-    lon = 3.3868447313078023
-    alt = 1000
 
-    lvl = get_modellevel_from_altitude(lat, lon, alt)
+    # ICON_switcher = "D2"        # Set to "EU" for ICON-EU model or "D2" for ICON-D2 model
+
+    # download_HHL()       # This function should only be executed once at the beginning. The HHL_level files are stored locally and can be accessed anytime
 
     variables_of_interest = ["t", "p", "qv", "u", "v", "w"]
 
-    for var in variables_of_interest:
-        download(lvl, var)
-        value = read_value_from_gribfile(f"ICON_{var}.grib2", lat, lon)
-        print(f"{var} = ", value)
+    points_in_space = ((55.61196234617108, 12.663305763212634, 500), (55.61196234617108, 12.663305763212634, 1000))
 
+    for point in points_in_space:
+
+        lat, lon, alt = point[0], point[1], point[2]
+
+        lvl = get_modellevel_from_altitude(lat, lon, alt)
+
+        print(point)
+
+        for var in variables_of_interest:
+
+            download(lvl, var)
+
+            value = read_value_from_gribfile(f"ICON_{var}.grib2", lat, lon)
+            print(f"{var} = ", value)
 
 
 if __name__ == '__main__':
