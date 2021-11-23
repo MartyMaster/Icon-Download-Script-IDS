@@ -16,8 +16,8 @@ def download(lvl, var):
         url = build_url(lvl, var)
         urllib.request.urlretrieve(url, f"ICON_{var}.grib2.bz2")
     except:
-        global older
-        older = True
+        global oldermodel
+        oldermodel = True
         url = build_url(lvl, var)
         urllib.request.urlretrieve(url, f"ICON_{var}.grib2.bz2")
 
@@ -63,7 +63,7 @@ def round_down_time():                         # Takes current UTC and rounds do
     else:
         rounder = 2
 
-    if older:
+    if oldermodel:
         rounder += 3
 
     rounded_time = str(actual_time.replace(microsecond=0, second=0, minute=0) - timedelta(hours=rounder))
@@ -176,8 +176,8 @@ def main():
 
         for var in variables_of_interest:
 
-            global older
-            older = False
+            global oldermodel
+            oldermodel = False
             download(lvl, var)
 
             value = read_value_from_gribfile(f"ICON_{var}.grib2", lat, lon)
