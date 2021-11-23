@@ -1,5 +1,4 @@
 import urllib.request
-import datetime
 from datetime import datetime, timedelta
 import bz2
 import os
@@ -13,8 +12,14 @@ import eccodes_get_nearest
 
 
 def download(lvl, var):
-    url = build_url(lvl, var)
-    urllib.request.urlretrieve(url, f"ICON_{var}.grib2.bz2")
+    try:
+        url = build_url(lvl, var)
+        urllib.request.urlretrieve(url, f"ICON_{var}.grib2.bz2")
+    except:
+        global older
+        older = True
+        url = build_url(lvl, var)
+        urllib.request.urlretrieve(url, f"ICON_{var}.grib2.bz2")
 
     unzip_file(f"ICON_{var}.grib2.bz2")
 
@@ -52,11 +57,14 @@ def round_down_time():                         # Takes current UTC and rounds do
     a = actual_time.hour
 
     if a == 0 or a == 3 or a == 6 or a == 9 or a == 12 or a == 15 or a == 18 or a == 21:
-        rounder = 3
+        rounder = 0
     elif a == 1 or a == 4 or a == 7 or a == 10 or a == 13 or a == 16 or a == 19 or a == 22:
-        rounder = 4
+        rounder = 1
     else:
         rounder = 2
+
+    if older:
+        rounder += 3
 
     rounded_time = str(actual_time.replace(microsecond=0, second=0, minute=0) - timedelta(hours=rounder))
     rounded_time = rounded_time.replace("-", "")
@@ -131,7 +139,7 @@ def read_value_from_gribfile(file, lat, lon):
     return value
 
 
-#################################               # not used
+#################################                  # not used
 #         ICON Switcher         #
 #################################
 
@@ -152,11 +160,11 @@ def main():
 
     # ICON_switcher = "D2"        # Set to "EU" for ICON-EU model or "D2" for ICON-D2 model
 
-    # download_HHL()       # This function should only be executed once at the beginning. The HHL_level files are stored locally and can be accessed anytime
+    # download_HHL()                # This function should only be executed once at the beginning. The HHL_level files are stored locally and can be accessed anytime
 
     variables_of_interest = ["t", "p", "qv", "u", "v", "w"]
 
-    points_in_space = ((55.61196234617108, 12.663305763212634, 500), (55.61196234617108, 12.663305763212634, 1000))
+    points_in_space = ((47.45749472348071, 8.55596091912026, 500), (47.45749472348071, 8.55596091912026, 1000))
 
     for point in points_in_space:
 
@@ -168,6 +176,8 @@ def main():
 
         for var in variables_of_interest:
 
+            global older
+            older = False
             download(lvl, var)
 
             value = read_value_from_gribfile(f"ICON_{var}.grib2", lat, lon)
