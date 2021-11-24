@@ -6,28 +6,32 @@ import sys
 import eccodes_get_nearest
 
 
-#################################                   # Assumption: the latest model will give the most accurate forecast
+#################################
 #          Download             #
 #################################
 
 
-def download(lvl, var):
+def download(lvl, var, time_at_point):
     try:
-        url = build_url(lvl, var)
+        url = build_url(lvl, var, time_at_point)
         urllib.request.urlretrieve(url, f"ICON_{var}.grib2.bz2")
     except:
         global oldermodel
         oldermodel = True
-        url = build_url(lvl, var)
+
+        url = build_url(lvl, var, time_at_point)
         urllib.request.urlretrieve(url, f"ICON_{var}.grib2.bz2")
 
     unzip_file(f"ICON_{var}.grib2.bz2")
 
 
-def build_url(lvl, var):
-    date = get_latest_model_date()
-    hour = get_latest_model_hour()
-    forecast_time = get_forecast_time()
+def build_url(lvl, var, time_at_point):
+    rounded_time = round_down_time(time_at_point)
+
+    date = rounded_time[0][0:8]
+    hour = rounded_time[0][9:11]
+    forecast_time = str(rounded_time[1]).zfill(3)
+
     modellevel = lvl
     variable = var
 
@@ -37,22 +41,7 @@ def build_url(lvl, var):
     return url
 
 
-def get_latest_model_date():
-    model_date = round_down_time()[0]       # use only first return, which is rounded_time
-    return model_date[0:8]                  # use only first 8 characters, ie the date
-
-
-def get_latest_model_hour():
-    model_hour = round_down_time()[0]        # use only first return, which is rounded_time
-    return model_hour[9:11]                  # use only characters 9 and 10, ie the hour
-
-
-def get_forecast_time():
-    forecast_time = round_down_time()[1]      # use only second return, which is rounder
-    return f"00{forecast_time}"               # add 00 in front to be in line with DWD nummeration
-
-
-def round_down_time():                         # Takes current UTC and rounds down to a 3hour intervall, which is as current as possible but more than 2 hours ago. This is the update cycle of ICON-D2
+def round_down_time(time_at_point):                         # takes current UTC and rounds down to a 3hour intervall. This is the update cycle of ICON-D2
     actual_time = datetime.utcnow()
     a = actual_time.hour
 
@@ -63,10 +52,20 @@ def round_down_time():                         # Takes current UTC and rounds do
     else:
         rounder = 2
 
-    if oldermodel:
+    if oldermodel:                                          # if latest model is not yet available take the one from 3 hours before
         rounder += 3
 
-    rounded_time = str(actual_time.replace(microsecond=0, second=0, minute=0) - timedelta(hours=rounder))
+    rounded_time = actual_time.replace(microsecond=0, second=0, minute=0) - timedelta(hours=rounder)
+
+    if type(time_at_point) is datetime:                     # if a time is given, take forecast from nearest hour to that time
+        difference = time_at_point - rounded_time
+        difference = difference.total_seconds()//60
+        rounder = str(round(difference / 60))
+
+    elif actual_time.minute > 30:                           # if no time is given, just take forecast from nearest full hour
+        rounder +=1
+
+    rounded_time = str(rounded_time)
     rounded_time = rounded_time.replace("-", "")
     rounded_time = rounded_time.replace(":", "")
 
@@ -97,8 +96,14 @@ def get_modellevel_from_altitude(lat, lon, alt):
 
 
 def download_HHL():                                 # This function should only be executed once at the beginning. The HHL_level files are stored locally and can be accessed anytime
-    date = get_latest_model_date()
-    hour = get_latest_model_hour()
+
+    global oldermodel                                # HHL is time-invariant, so it's not necessary to check whether the latest model is available. It's easier to just download an older file.
+    oldermodel = True
+
+    rounded_time = round_down_time(0)
+
+    date = rounded_time[0][0:8]
+    hour = rounded_time[0][9:11]
 
     for i in range(1, 67):
         url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/hhl/icon-d2_germany_regular-lat-lon_time-invariant_{date}{hour}_000_{i}_hhl.grib2.bz2"
@@ -164,11 +169,19 @@ def main():
 
     variables_of_interest = ["t", "p", "qv", "u", "v", "w"]
 
-    points_in_space = ((47.45749472348071, 8.55596091912026, 500), (47.45749472348071, 8.55596091912026, 1000))
+    points_in_space = ((47.45749472348071, 8.55596091912026, 500), (47.45749472348071, 8.55596091912026, 433, 2021, 11, 24, 16, 55), (47.45749472348071, 8.55596091912026, 433, 2021, 11, 24, 20, 55), (47.45749472348071, 8.55596091912026, 433, 2021, 11, 25, 0, 55))
+    #points_in_space = ()
+
 
     for point in points_in_space:
 
         lat, lon, alt = point[0], point[1], point[2]
+        if len(point) > 3:
+            time_at_point = datetime(point[3], point[4], point[5], point[6], point[7])
+            print(time_at_point)
+        else:
+            time_at_point = 0
+            print("Current time taken")
 
         lvl = get_modellevel_from_altitude(lat, lon, alt)
 
@@ -176,9 +189,10 @@ def main():
 
         for var in variables_of_interest:
 
-            global oldermodel
+            global oldermodel                       # used if latest model is not yet available
             oldermodel = False
-            download(lvl, var)
+
+            download(lvl, var, time_at_point)
 
             value = read_value_from_gribfile(f"ICON_{var}.grib2", lat, lon)
             print(f"{var} = ", value)
