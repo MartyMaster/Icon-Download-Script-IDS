@@ -62,7 +62,7 @@ def round_down_time(time_at_point):                         # takes current UTC 
         difference = difference.total_seconds()//60
         rounder = str(round(difference / 60))
         if int(rounder) > 24 or int(rounder) < 0:
-            sys.exit("Time given out of window")
+            sys.exit("Time given is out of window")
 
     elif actual_time.minute > 30:                           # if no time is given, just take forecast from nearest full hour
         rounder +=1
@@ -84,11 +84,17 @@ def get_modellevel_from_altitude(lat, lon, alt):
     HHLs = []                                       # List of altitudes of all halflevels
     HFLs = []                                       # List of altitudes of all fulllevels
 
-    for i in range(1, 67):                          # Get values for all halflevels
-        HHL = read_value_from_gribfile(f"HHL_level_{i}.grib2", lat, lon)
-        HHLs.append(HHL)
+    i = 1
+    while True:                                     # Get values for all halflevels
+        try:
+            HHL = read_value_from_gribfile(f"HHL_level_{i}.grib2", lat, lon)
+            HHLs.append(HHL)
+        except:
+            break
+        finally:
+            i += 1
 
-    for i in range(0, 65):                          # Calculate fulllevels from halflevels
+    for i in range(0, len(HHLs) - 1):                          # Calculate fulllevels from halflevels
         HFL = (HHLs[i] + HHLs[i+1])/2
         HFLs.append(HFL)
 
@@ -107,13 +113,20 @@ def download_HHL():                                 # This function should only 
     date = rounded_time[0][0:8]
     hour = rounded_time[0][9:11]
 
-    for i in range(1, 67):
-        url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/hhl/icon-d2_germany_regular-lat-lon" \
-              f"_time-invariant_{date}{hour}_000_{i}_hhl.grib2.bz2"
-        print(url)
-        urllib.request.urlretrieve(url, f"HHL_level_{i}.grib2.bz2")
+    i = 1
+    while True:  # Get values for all halflevels
+        try:
+            url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/hhl/icon-d2_germany_regular-lat-lon" \
+                  f"_time-invariant_{date}{hour}_000_{i}_hhl.grib2.bz2"
+            #print(url)
+            urllib.request.urlretrieve(url, f"HHL_level_{i}.grib2.bz2")
 
-        unzip_file(f"HHL_level_{i}.grib2.bz2")
+            unzip_file(f"HHL_level_{i}.grib2.bz2")
+        except:
+            break
+        finally:
+            i += 1
+
 
     # for i in range(1, 67):
     #    os.remove(os.path.join(sys.path[0], f"HHL_level_{i}.grib2"))
@@ -165,14 +178,18 @@ def icon_switcher(switcher):
 
 
 def main():
+    print(datetime.now())
 
-    # ICON_switcher = "D2"        # Set to "EU" for ICON-EU model or "D2" for ICON-D2 model
+    global ICON_switcher
+    ICON_switcher = "D2"            # Set to "EU" for ICON-EU model or "D2" for ICON-D2 model
 
-    # download_HHL()                # This function should only be executed once at the beginning. The HHL_level files are stored locally and can be accessed anytime
+    download_HHL()                # This function should only be executed once at the beginning. The HHL_level files are stored locally and can be accessed anytime
+
+    print(datetime.now())
 
     variables_of_interest = ["t", "p", "qv", "u", "v", "w"]
 
-    points_in_space = ((47.45749472348071, 8.55596091912026, 500), (47.45749472348071, 8.55596091912026, 433, 2021, 11, 24, 0, 55))
+    points_in_space = ((47.45749472348071, 8.55596091912026, 500), (47.45749472348071, 8.55596091912026, 433, 2021, 11, 25, 0, 55))
     #points_in_space = ()
 
 
@@ -200,6 +217,7 @@ def main():
             value = read_value_from_gribfile(f"ICON_{var}.grib2", lat, lon)
             print(f"{var} = ", value)
 
+    print(datetime.now())
 
 if __name__ == '__main__':
     sys.exit(main())
