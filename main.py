@@ -61,6 +61,8 @@ def round_down_time(time_at_point):                         # takes current UTC 
         difference = time_at_point - rounded_time
         difference = difference.total_seconds()//60
         rounder = str(round(difference / 60))
+        if int(rounder) > 24 or int(rounder) < 0:
+            sys.exit("Time given out of window")
 
     elif actual_time.minute > 30:                           # if no time is given, just take forecast from nearest full hour
         rounder +=1
@@ -106,7 +108,8 @@ def download_HHL():                                 # This function should only 
     hour = rounded_time[0][9:11]
 
     for i in range(1, 67):
-        url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/hhl/icon-d2_germany_regular-lat-lon_time-invariant_{date}{hour}_000_{i}_hhl.grib2.bz2"
+        url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/hhl/icon-d2_germany_regular-lat-lon" \
+              f"_time-invariant_{date}{hour}_000_{i}_hhl.grib2.bz2"
         print(url)
         urllib.request.urlretrieve(url, f"HHL_level_{i}.grib2.bz2")
 
@@ -169,7 +172,7 @@ def main():
 
     variables_of_interest = ["t", "p", "qv", "u", "v", "w"]
 
-    points_in_space = ((47.45749472348071, 8.55596091912026, 500), (47.45749472348071, 8.55596091912026, 433, 2021, 11, 24, 16, 55), (47.45749472348071, 8.55596091912026, 433, 2021, 11, 24, 20, 55), (47.45749472348071, 8.55596091912026, 433, 2021, 11, 25, 0, 55))
+    points_in_space = ((47.45749472348071, 8.55596091912026, 500), (47.45749472348071, 8.55596091912026, 433, 2021, 11, 24, 0, 55))
     #points_in_space = ()
 
 
