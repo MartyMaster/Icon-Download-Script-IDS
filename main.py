@@ -45,7 +45,7 @@ def build_url(lvl, var, time_at_point):
     return url
 
 
-def round_down_time(time_at_point):                         # takes current UTC and rounds down to a 3hour intervall. This is the update cycle of ICON-D2
+def round_down_time(time_at_point):                         # takes current UTC and rounds down to a 3hour interval. This is the update cycle of ICON-D2
     actual_time = datetime.utcnow()
     a = actual_time.hour
 
@@ -83,12 +83,12 @@ def round_down_time(time_at_point):                         # takes current UTC 
 #################################
 
 
-def get_modellevel_from_altitude(lat, lon, alt):
+def get_modellevel_from_altitude(lat, lon, alt):        # Returns the fulllevel which is closest to the given altitude
 
     HHLs = []                                       # List of altitudes of all halflevels
     HFLs = []                                       # List of altitudes of all fulllevels
 
-    i = 1
+    i = 30  # IMPORTANT: Default i = 1 ! i = 30 means, that the top 30 levels are not considered. If this i is changed here, change the "level = ..." equation below too; set the last expression ( + ...) to the same value as i here.
     while True:                                     # Get values for all halflevels
         try:
             HHL = read_value_from_gribfile(f"{ICON_switcher}_HHL_level_{i}.grib2", lat, lon)
@@ -102,7 +102,7 @@ def get_modellevel_from_altitude(lat, lon, alt):
         HFL = (HHLs[i] + HHLs[i+1])/2
         HFLs.append(HFL)
 
-    level = min(range(len(HFLs)), key=lambda i: abs(HFLs[i] - alt)) + 1         # Returns the fulllevel which is closest to the given altitude
+    level = min(range(len(HFLs)), key=lambda i: abs(HFLs[i] - alt)) + 30    # IMPORTANT: If i above is changed, change here the last expression ( + ... ) to that same value as i above (default i = 1). Otherwise the wrong level will be returned.
 
     return level
 
@@ -176,7 +176,7 @@ def main():
     print(datetime.now())
 
     global ICON_switcher
-    ICON_switcher = "EU"            # Set to "EU" for ICON-EU model or "D2" for ICON-D2 model
+    ICON_switcher = "D2"
 
     # download_HHL()                # This function should only be executed once at the beginning. The HHL_level files are stored locally and can be accessed anytime
 
@@ -188,6 +188,8 @@ def main():
 
     for point in points_in_space:
 
+        ICON_switcher = "D2"
+
         lat, lon, alt = point[0], point[1], point[2]
         if len(point) > 3:
             time_at_point = datetime(point[3], point[4], point[5], point[6], point[7])
@@ -196,9 +198,19 @@ def main():
             time_at_point = 0
             print("Current time taken")
 
+        if 44 <= lat <= 50:
+            if not 0 <= lon <= 17:
+                ICON_switcher = "EU"
+        elif 50 < lat <= 57:
+            if not -1.5 <= lon <= 18.5 and not 358.5 <= lon:
+                ICON_switcher = "EU"
+        else:
+            ICON_switcher = "EU"
+
+
         lvl = get_modellevel_from_altitude(lat, lon, alt)
 
-        print(point)
+        print("Point:", point, "// Model taken: ", ICON_switcher)
 
         for var in variables_of_interest:
 
@@ -209,8 +221,6 @@ def main():
 
             value = read_value_from_gribfile(f"{ICON_switcher}_ICON_{var}.grib2", lat, lon)
             print(f"{var} = ", value)
-
-    print(datetime.now())
 
 
 if __name__ == '__main__':
