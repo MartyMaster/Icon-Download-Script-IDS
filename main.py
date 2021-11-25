@@ -14,15 +14,15 @@ import eccodes_get_nearest
 def download(lvl, var, time_at_point):
     try:
         url = build_url(lvl, var, time_at_point)
-        urllib.request.urlretrieve(url, f"ICON_{var}.grib2.bz2")
+        urllib.request.urlretrieve(url, f"{ICON_switcher}_ICON_{var}.grib2.bz2")
     except:
         global oldermodel
         oldermodel = True
 
         url = build_url(lvl, var, time_at_point)
-        urllib.request.urlretrieve(url, f"ICON_{var}.grib2.bz2")
+        urllib.request.urlretrieve(url, f"{ICON_switcher}_ICON_{var}.grib2.bz2")
 
-    unzip_file(f"ICON_{var}.grib2.bz2")
+    unzip_file(f"{ICON_switcher}_ICON_{var}.grib2.bz2")
 
 
 def build_url(lvl, var, time_at_point):
@@ -30,13 +30,17 @@ def build_url(lvl, var, time_at_point):
 
     date = rounded_time[0][0:8]
     hour = rounded_time[0][9:11]
-    forecast_time = str(rounded_time[1]).zfill(3)
+    forecast_time = str(rounded_time[1]).zfill(3)                       # fill with 0 until string is 3 digits long
 
     modellevel = lvl
     variable = var
 
-    url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/{variable}" \
-          f"/icon-d2_germany_regular-lat-lon_model-level_{date}{hour}_{forecast_time}_{modellevel}_{variable}.grib2.bz2"
+    if ICON_switcher == "D2":
+        url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/{variable}/icon-d2_germany_" \
+              f"regular-lat-lon_model-level_{date}{hour}_{forecast_time}_{modellevel}_{variable}.grib2.bz2"
+    elif ICON_switcher == "EU":
+        url = f"https://opendata.dwd.de/weather/nwp/icon-eu/grib/{hour}/{variable}/icon-eu_europe_" \
+              f"regular-lat-lon_model-level_{date}{hour}_{forecast_time}_{modellevel}_{variable.upper()}.grib2.bz2"
 
     return url
 
@@ -65,7 +69,7 @@ def round_down_time(time_at_point):                         # takes current UTC 
             sys.exit("Time given is out of window")
 
     elif actual_time.minute > 30:                           # if no time is given, just take forecast from nearest full hour
-        rounder +=1
+        rounder += 1
 
     rounded_time = str(rounded_time)
     rounded_time = rounded_time.replace("-", "")
@@ -87,7 +91,7 @@ def get_modellevel_from_altitude(lat, lon, alt):
     i = 1
     while True:                                     # Get values for all halflevels
         try:
-            HHL = read_value_from_gribfile(f"HHL_level_{i}.grib2", lat, lon)
+            HHL = read_value_from_gribfile(f"{ICON_switcher}_HHL_level_{i}.grib2", lat, lon)
             HHLs.append(HHL)
         except:
             break
@@ -114,19 +118,22 @@ def download_HHL():                                 # This function should only 
     hour = rounded_time[0][9:11]
 
     i = 1
-    while True:  # Get values for all halflevels
+    while True:
         try:
-            url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/hhl/icon-d2_germany_regular-lat-lon" \
-                  f"_time-invariant_{date}{hour}_000_{i}_hhl.grib2.bz2"
-            #print(url)
-            urllib.request.urlretrieve(url, f"HHL_level_{i}.grib2.bz2")
+            if ICON_switcher == "D2":
+                url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/hhl/icon-d2_germany_regular-lat-lon" \
+                      f"_time-invariant_{date}{hour}_000_{i}_hhl.grib2.bz2"
+            elif ICON_switcher == "EU":
+                url = f"https://opendata.dwd.de/weather/nwp/icon-eu/grib/{hour}/hhl/icon-eu_europe_regular-lat-lon_" \
+                      f"time-invariant_{date}{hour}_{i}_HHL.grib2.bz2"
+            # print(url)
+            urllib.request.urlretrieve(url, f"{ICON_switcher}_HHL_level_{i}.grib2.bz2")
 
-            unzip_file(f"HHL_level_{i}.grib2.bz2")
+            unzip_file(f"{ICON_switcher}_HHL_level_{i}.grib2.bz2")
         except:
             break
         finally:
             i += 1
-
 
     # for i in range(1, 67):
     #    os.remove(os.path.join(sys.path[0], f"HHL_level_{i}.grib2"))
@@ -160,18 +167,6 @@ def read_value_from_gribfile(file, lat, lon):
     return value
 
 
-#################################                  # not used
-#         ICON Switcher         #
-#################################
-
-def icon_switcher(switcher):
-
-    if switcher == "D2":
-        return "icon-d2", "icon-d2_germany", 65
-    elif switcher == "EU":
-        return "icon-eu", "icon-eu_europe", 60
-
-
 #################################
 #             Main              #
 #################################
@@ -181,16 +176,14 @@ def main():
     print(datetime.now())
 
     global ICON_switcher
-    ICON_switcher = "D2"            # Set to "EU" for ICON-EU model or "D2" for ICON-D2 model
+    ICON_switcher = "EU"            # Set to "EU" for ICON-EU model or "D2" for ICON-D2 model
 
-    download_HHL()                # This function should only be executed once at the beginning. The HHL_level files are stored locally and can be accessed anytime
-
-    print(datetime.now())
+    # download_HHL()                # This function should only be executed once at the beginning. The HHL_level files are stored locally and can be accessed anytime
 
     variables_of_interest = ["t", "p", "qv", "u", "v", "w"]
 
-    points_in_space = ((47.45749472348071, 8.55596091912026, 500), (47.45749472348071, 8.55596091912026, 433, 2021, 11, 25, 0, 55))
-    #points_in_space = ()
+    points_in_space = ((47.45749472348071, 8.55596091912026, 500), (47.45749472348071, 8.55596091912026, 433, 2021, 11, 25, 11, 55))
+    # points_in_space = ()
 
 
     for point in points_in_space:
@@ -214,10 +207,11 @@ def main():
 
             download(lvl, var, time_at_point)
 
-            value = read_value_from_gribfile(f"ICON_{var}.grib2", lat, lon)
+            value = read_value_from_gribfile(f"{ICON_switcher}_ICON_{var}.grib2", lat, lon)
             print(f"{var} = ", value)
 
     print(datetime.now())
+
 
 if __name__ == '__main__':
     sys.exit(main())
