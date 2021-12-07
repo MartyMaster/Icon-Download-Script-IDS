@@ -14,16 +14,16 @@ from eccodes import *
 
 def download(lvl, var, time_at_point):
     try:
-        url = build_url(lvl, var, time_at_point)
-        urllib.request.urlretrieve(url, f"{ICON_switcher}_ICON_{var}.grib2.bz2")
+        url, filename = build_url(lvl, var, time_at_point)
+        urllib.request.urlretrieve(url, filename)
     except:
         global oldermodel
         oldermodel = True
 
-        url = build_url(lvl, var, time_at_point)
-        urllib.request.urlretrieve(url, f"{ICON_switcher}_ICON_{var}.grib2.bz2")
+        url, filename = build_url(lvl, var, time_at_point)
+        urllib.request.urlretrieve(url, filename)
 
-    unzip_file(f"{ICON_switcher}_ICON_{var}.grib2.bz2")
+    unzip_file(filename)
 
 
 def build_url(lvl, var, time_at_point):
@@ -37,13 +37,13 @@ def build_url(lvl, var, time_at_point):
     variable = var
 
     if ICON_switcher == "D2":
-        url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/{variable}/icon-d2_germany_" \
-              f"regular-lat-lon_model-level_{date}{hour}_{forecast_time}_{modellevel}_{variable}.grib2.bz2"
+        filename = f"icon-d2_germany_regular-lat-lon_model-level_{date}{hour}_{forecast_time}_{modellevel}_{variable}.grib2.bz2"
+        url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/{variable}/{filename}"
     elif ICON_switcher == "EU":
-        url = f"https://opendata.dwd.de/weather/nwp/icon-eu/grib/{hour}/{variable}/icon-eu_europe_" \
-              f"regular-lat-lon_model-level_{date}{hour}_{forecast_time}_{modellevel}_{variable.upper()}.grib2.bz2"
+        filename = f"icon-eu_europe_regular-lat-lon_model-level_{date}{hour}_{forecast_time}_{modellevel}_{variable.upper()}.grib2.bz2"
+        url = f"https://opendata.dwd.de/weather/nwp/icon-eu/grib/{hour}/{variable}/{filename}"
 
-    return url
+    return url, filename
 
 
 def round_down_time(time_at_point):                         # takes current UTC and rounds down to a 3hour interval. This is the update cycle of ICON-D2
@@ -108,6 +108,11 @@ def get_modellevel_from_altitude(index, alt):        # Returns the fulllevel whi
     return level
 
 
+#################################
+#         Download HHL          #
+#################################
+
+
 def download_HHL():                                 # This function should only be executed once at the beginning. The HHL_level files are stored locally and can be accessed anytime
 
     global oldermodel                                # HHL is time-invariant, so it's not necessary to check whether the latest model is available. It's easier to just download an older file.
@@ -121,13 +126,24 @@ def download_HHL():                                 # This function should only 
     i = 1
     while True:
         try:
-            if ICON_switcher == "D2":
-                url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/hhl/icon-d2_germany_regular-lat-lon" \
-                      f"_time-invariant_{date}{hour}_000_{i}_hhl.grib2.bz2"
-            elif ICON_switcher == "EU":
-                url = f"https://opendata.dwd.de/weather/nwp/icon-eu/grib/{hour}/hhl/icon-eu_europe_regular-lat-lon_" \
-                      f"time-invariant_{date}{hour}_{i}_HHL.grib2.bz2"
-            # print(url)
+            ICON_switcher = "D2"
+            url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/hhl/icon-d2_germany_regular-lat-lon" \
+                  f"_time-invariant_{date}{hour}_000_{i}_hhl.grib2.bz2"
+
+            urllib.request.urlretrieve(url, f"{ICON_switcher}_HHL_level_{i}.grib2.bz2")
+
+            unzip_file(f"{ICON_switcher}_HHL_level_{i}.grib2.bz2")
+        except:
+            break
+        finally:
+            i += 1
+
+    i = 1
+    while True:
+        try:
+            ICON_switcher = "EU"
+            url = f"https://opendata.dwd.de/weather/nwp/icon-eu/grib/{hour}/hhl/icon-eu_europe_regular-lat-lon_" \
+                  f"time-invariant_{date}{hour}_{i}_HHL.grib2.bz2"
             urllib.request.urlretrieve(url, f"{ICON_switcher}_HHL_level_{i}.grib2.bz2")
 
             unzip_file(f"{ICON_switcher}_HHL_level_{i}.grib2.bz2")
@@ -170,6 +186,7 @@ def get_index_from_gribfile(file, lat, lon):
 #           Reading             #
 #################################
 
+
 def read_value_from_gribfile(file, index):
     f = open(os.path.join(sys.path[0], file), 'rb')
     gid = codes_grib_new_from_file(f)
@@ -189,18 +206,17 @@ def read_value_from_gribfile(file, index):
 
 def main():
 
-    global ICON_switcher
-    ICON_switcher = "D2"
-
     # download_HHL()                # This function should only be executed once at the beginning. The HHL_level files are stored locally and can be accessed anytime
 
     variables_of_interest = ["t", "p", "qv", "u", "v", "w"]
 
-    points_in_space = ((47.45749472348071, 8.55596091912026, 433), (37.45749472348071, 8.55596091912026, 433, 2021, 12, 7, 17, 55))
+    points_in_space = ((52.31588730661351, 4.778950137403114, 0), (52.31588730661351, 4.778950137403114, 0, 2021, 12, 7, 21, 55))
+    # points_in_space = points_simulator()
 
 
     for point in points_in_space:
 
+        global ICON_switcher
         ICON_switcher = "D2"
 
         lat, lon, alt = point[0], point[1], point[2]
@@ -231,10 +247,40 @@ def main():
             global oldermodel                       # used if latest model is not yet available
             oldermodel = False
 
-            download(lvl, var, time_at_point)
+            try:                                                       # check if file is already present
+                filename = build_url(lvl, var, time_at_point)[1][:-4]
+                value = read_value_from_gribfile(filename, index)
 
-            value = read_value_from_gribfile(f"{ICON_switcher}_ICON_{var}.grib2", index)
+            except:                                                    # if not, check if file of older model is present
+                try:
+                    oldermodel = True
+
+                    filename = build_url(lvl, var, time_at_point)[1][:-4]
+                    value = read_value_from_gribfile(filename, index)
+
+                except:                                                # if both files are not yet present, download
+                    oldermodel = False
+
+                    download(lvl, var, time_at_point)
+                    filename = build_url(lvl, var, time_at_point)[1][:-4]
+                    value = read_value_from_gribfile(filename, index)
+
             print(f"{var} = ", value)
+
+
+def points_simulator():
+
+    points_in_space = []
+
+    alt = 0
+    for i in range(100):
+        points_in_space.append((52.31588730661351, 4.778950137403114, alt))
+        alt += 17
+        points_in_space.append((52.31588730661351, 4.778950137403114, alt, 2021, 12, 7, 17, 55))
+        alt += 17
+        i += 1
+
+    return points_in_space
 
 
 if __name__ == '__main__':
