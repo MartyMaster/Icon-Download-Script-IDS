@@ -1,10 +1,12 @@
 import urllib.request
 from datetime import datetime, timedelta
+import time
 import bz2
 import os
 import sys
 import eccodes_get_nearest
 from eccodes import *
+import fnmatch
 
 
 #################################
@@ -200,6 +202,20 @@ def read_value_from_gribfile(file, index):
 
 
 #################################
+#      Remove old files         #
+#################################
+
+
+def remove_old_files():                     # removes any variable-file that is older than 4 hours
+
+    for file in os.listdir('.'):
+        if fnmatch.fnmatch(file, '*regular-lat-lon*'):
+            file_age = (time.time() - os.path.getmtime(file))/3600
+            if file_age > 4:
+                os.remove(file)
+
+
+#################################
 #             Main              #
 #################################
 
@@ -266,6 +282,8 @@ def main():
                     value = read_value_from_gribfile(filename, index)
 
             print(f"{var} = ", value)
+
+    remove_old_files()
 
 
 def points_simulator():
