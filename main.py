@@ -4,6 +4,7 @@ import bz2
 import os
 import sys
 import eccodes_get_nearest
+from eccodes import *
 
 
 #################################
@@ -83,15 +84,15 @@ def round_down_time(time_at_point):                         # takes current UTC 
 #################################
 
 
-def get_modellevel_from_altitude(lat, lon, alt):        # Returns the fulllevel which is closest to the given altitude
+def get_modellevel_from_altitude(index, alt):        # Returns the fulllevel which is closest to the given altitude
 
     HHLs = []                                       # List of altitudes of all halflevels
     HFLs = []                                       # List of altitudes of all fulllevels
 
-    i = 30  # IMPORTANT: Default i = 1 ! i = 30 means, that the top 30 levels are not considered. If this i is changed here, change the "level = ..." equation below too; set the last expression ( + ...) to the same value as i here.
+    i = 1
     while True:                                     # Get values for all halflevels
         try:
-            HHL = read_value_from_gribfile(f"{ICON_switcher}_HHL_level_{i}.grib2", lat, lon)
+            HHL = read_value_from_gribfile(f"{ICON_switcher}_HHL_level_{i}.grib2", index)
             HHLs.append(HHL)
         except:
             break
@@ -102,7 +103,7 @@ def get_modellevel_from_altitude(lat, lon, alt):        # Returns the fulllevel 
         HFL = (HHLs[i] + HHLs[i+1])/2
         HFLs.append(HFL)
 
-    level = min(range(len(HFLs)), key=lambda i: abs(HFLs[i] - alt)) + 30    # IMPORTANT: If i above is changed, change here the last expression ( + ... ) to that same value as i above (default i = 1). Otherwise the wrong level will be returned.
+    level = min(range(len(HFLs)), key=lambda i: abs(HFLs[i] - alt)) + 1
 
     return level
 
@@ -158,13 +159,27 @@ def unzip_file(file):
 
 
 #################################
+#        Getting index          #
+#################################
+
+def get_index_from_gribfile(file, lat, lon):
+    value = eccodes_get_nearest.main(file, lat, lon)
+    return value
+
+#################################
 #           Reading             #
 #################################
 
-def read_value_from_gribfile(file, lat, lon):
+def read_value_from_gribfile(file, index):
+    f = open(os.path.join(sys.path[0], file), 'rb')
+    gid = codes_grib_new_from_file(f)
 
-    value = eccodes_get_nearest.main(file, lat, lon)
-    return value
+    value = codes_get_values(gid)
+
+    codes_release(gid)
+    f.close()
+
+    return value[index]
 
 
 #################################
@@ -173,7 +188,6 @@ def read_value_from_gribfile(file, lat, lon):
 
 
 def main():
-    print(datetime.now())
 
     global ICON_switcher
     ICON_switcher = "D2"
@@ -182,8 +196,7 @@ def main():
 
     variables_of_interest = ["t", "p", "qv", "u", "v", "w"]
 
-    points_in_space = ((47.45749472348071, 8.55596091912026, 500), (47.45749472348071, 8.55596091912026, 433, 2021, 11, 25, 11, 55))
-    # points_in_space = ()
+    points_in_space = ((47.45749472348071, 8.55596091912026, 433), (37.45749472348071, 8.55596091912026, 433, 2021, 12, 7, 17, 55))
 
 
     for point in points_in_space:
@@ -207,10 +220,11 @@ def main():
         else:
             ICON_switcher = "EU"
 
+        index = get_index_from_gribfile(f"{ICON_switcher}_HHL_level_1.grib2", lat, lon)
 
-        lvl = get_modellevel_from_altitude(lat, lon, alt)
+        lvl = get_modellevel_from_altitude(index, alt)
 
-        print("Point:", point, "// Model taken: ", ICON_switcher)
+        print("Point:", point, "// Model taken:", ICON_switcher, "// Level:", lvl)
 
         for var in variables_of_interest:
 
@@ -219,7 +233,7 @@ def main():
 
             download(lvl, var, time_at_point)
 
-            value = read_value_from_gribfile(f"{ICON_switcher}_ICON_{var}.grib2", lat, lon)
+            value = read_value_from_gribfile(f"{ICON_switcher}_ICON_{var}.grib2", index)
             print(f"{var} = ", value)
 
 

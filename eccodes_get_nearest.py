@@ -16,7 +16,6 @@ import os
 
 from eccodes import *
 
-# INPUT = os.path.join(sys.path[0], 'hsurf.grib2')
 VERBOSE = 1  # verbose error reporting
 
 
@@ -26,21 +25,11 @@ def get_nearest(input_file, input_lat, input_lon):
     gid = codes_grib_new_from_file(f)
 
     nearest = codes_grib_find_nearest(gid, input_lat, input_lon)[0]
-        # print(lat, lon)
-        # print(nearest.lat, nearest.lon, nearest.value, nearest.distance,
-        #      nearest.index)
-
-        # four = codes_grib_find_nearest(gid, lat, lon, is_lsm=False, npoints=1)
-        # for i in range(len(four)):
-        #    print("- %d -" % i)
-        #    print(four[i])
-
-        # print("-" * 100)
 
     codes_release(gid)
     f.close()
 
-    return nearest.value
+    return nearest.index
 
 
 def main(input_file, input_lat, input_lon):
