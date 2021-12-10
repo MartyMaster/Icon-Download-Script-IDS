@@ -10,83 +10,74 @@ import fnmatch
 
 
 #################################
-#          Download             #
+#         Download HHL          #
 #################################
 
+def download_HHL():
+    """
+    Checks if enough HHL-files are present. If not it downloads them.
+    """
 
-def download(lvl, var, time_at_point):
-    try:
-        url, filename = build_url(lvl, var, time_at_point)
-        urllib.request.urlretrieve(url, filename)
-    except:
-        global oldermodel
-        oldermodel = True
+    HHL_counter = 0
+    for file in os.listdir('.'):
+        if fnmatch.fnmatch(file, '*HHL_level*'):
+            HHL_counter += 1
 
-        url, filename = build_url(lvl, var, time_at_point)
-        urllib.request.urlretrieve(url, filename)
+    if HHL_counter > 126:
+        return
 
-    unzip_file(filename)
+    global oldermodel                  # HHL is time-invariant, so it's not necessary to check whether the latest model
+    oldermodel = True                  # is available. It's easier to just download an older file.
 
-
-def build_url(lvl, var, time_at_point):
-    rounded_time = round_down_time(time_at_point)
+    rounded_time = round_down_time(0)
 
     date = rounded_time[0][0:8]
     hour = rounded_time[0][9:11]
-    forecast_time = str(rounded_time[1]).zfill(3)                       # fill with 0 until string is 3 digits long
 
-    modellevel = lvl
-    variable = var
+    for i in range(1, 67):
+        url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/hhl/icon-d2_germany_regular-lat-lon" \
+              f"_time-invariant_{date}{hour}_000_{i}_hhl.grib2.bz2"
 
-    if ICON_switcher == "D2":
-        filename = f"icon-d2_germany_regular-lat-lon_model-level_{date}{hour}_{forecast_time}_{modellevel}_{variable}.grib2.bz2"
-        url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/{variable}/{filename}"
-    elif ICON_switcher == "EU":
-        filename = f"icon-eu_europe_regular-lat-lon_model-level_{date}{hour}_{forecast_time}_{modellevel}_{variable.upper()}.grib2.bz2"
-        url = f"https://opendata.dwd.de/weather/nwp/icon-eu/grib/{hour}/{variable}/{filename}"
+        urllib.request.urlretrieve(url, f"D2_HHL_level_{i}.grib2.bz2")
 
-    return url, filename
+        unzip_file(f"D2_HHL_level_{i}.grib2.bz2")
+        i += 1
+
+    for i in range(1, 62):
+        url = f"https://opendata.dwd.de/weather/nwp/icon-eu/grib/{hour}/hhl/icon-eu_europe_regular-lat-lon_" \
+              f"time-invariant_{date}{hour}_{i}_HHL.grib2.bz2"
+
+        urllib.request.urlretrieve(url, f"EU_HHL_level_{i}.grib2.bz2")
+
+        unzip_file(f"EU_HHL_level_{i}.grib2.bz2")
+        i += 1
 
 
-def round_down_time(time_at_point):                         # takes current UTC and rounds down to a 3hour interval. This is the update cycle of ICON-D2
-    actual_time = datetime.utcnow()
-    a = actual_time.hour
+#################################
+#        Getting index          #
+#################################
 
-    if a == 0 or a == 3 or a == 6 or a == 9 or a == 12 or a == 15 or a == 18 or a == 21:
-        rounder = 0
-    elif a == 1 or a == 4 or a == 7 or a == 10 or a == 13 or a == 16 or a == 19 or a == 22:
-        rounder = 1
-    else:
-        rounder = 2
-
-    if oldermodel:                                          # if latest model is not yet available take the one from 3 hours before
-        rounder += 3
-
-    rounded_time = actual_time.replace(microsecond=0, second=0, minute=0) - timedelta(hours=rounder)
-
-    if type(time_at_point) is datetime:                     # if a time is given, take forecast from nearest hour to that time
-        difference = time_at_point - rounded_time
-        difference = difference.total_seconds()//60
-        rounder = str(round(difference / 60))
-        if int(rounder) > 24 or int(rounder) < 0:
-            sys.exit("Time given is out of window")
-
-    elif actual_time.minute > 30:                           # if no time is given, just take forecast from nearest full hour
-        rounder += 1
-
-    rounded_time = str(rounded_time)
-    rounded_time = rounded_time.replace("-", "")
-    rounded_time = rounded_time.replace(":", "")
-
-    return rounded_time, rounder
+def get_index_from_gribfile(file, lat, lon):
+    """
+    Calls eccodes_get_nearest.py which gives the index of the nearest point for any lat-lon-coordinate.
+    """
+    index = eccodes_get_nearest.main(file, lat, lon)
+    return index
 
 
 #################################
 #        Get Modellevel         #
 #################################
 
+def get_modellevel_from_altitude(index, alt):
+    """
+    Returns the fulllevel which is closest to the given altitude at given index. This function works with a try/except
+    block, because the ICON-D2 and the ICON-EU models do not have the same amount of levels.
 
-def get_modellevel_from_altitude(index, alt):        # Returns the fulllevel which is closest to the given altitude
+    :param index
+    :param alt
+    :return: level
+    """
 
     HHLs = []                                       # List of altitudes of all halflevels
     HFLs = []                                       # List of altitudes of all fulllevels
@@ -111,59 +102,99 @@ def get_modellevel_from_altitude(index, alt):        # Returns the fulllevel whi
 
 
 #################################
-#         Download HHL          #
+#          Download             #
 #################################
 
+def download(lvl, var, time_at_point):
+    """
+    Checks if latest model is already available and downloads it. If not, it downloads the previous model.
+    """
 
-def download_HHL():                                 # This function should only be executed once at the beginning. The HHL_level files are stored locally and can be accessed anytime
+    try:
+        url, filename = build_url(lvl, var, time_at_point)
+        urllib.request.urlretrieve(url, filename)
+    except:
+        global oldermodel
+        oldermodel = True
 
-    global oldermodel                                # HHL is time-invariant, so it's not necessary to check whether the latest model is available. It's easier to just download an older file.
-    oldermodel = True
+        url, filename = build_url(lvl, var, time_at_point)
+        urllib.request.urlretrieve(url, filename)
 
-    rounded_time = round_down_time(0)
+    unzip_file(filename)
+
+
+def build_url(lvl, var, time_at_point):
+    rounded_time = round_down_time(time_at_point)
 
     date = rounded_time[0][0:8]
     hour = rounded_time[0][9:11]
+    forecast_time = str(rounded_time[1]).zfill(3)               # fill with 0 until string is 3 digits long
 
-    i = 1
-    while True:
-        try:
-            ICON_switcher = "D2"
-            url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/hhl/icon-d2_germany_regular-lat-lon" \
-                  f"_time-invariant_{date}{hour}_000_{i}_hhl.grib2.bz2"
+    modellevel = lvl
+    variable = var
 
-            urllib.request.urlretrieve(url, f"{ICON_switcher}_HHL_level_{i}.grib2.bz2")
+    if ICON_switcher == "D2":
+        filename = f"icon-d2_germany_regular-lat-lon_model-level_{date}{hour}_{forecast_time}_{modellevel}_" \
+                   f"{variable}.grib2.bz2"
+        url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/{variable}/{filename}"
+    elif ICON_switcher == "EU":
+        filename = f"icon-eu_europe_regular-lat-lon_model-level_{date}{hour}_{forecast_time}_{modellevel}_" \
+                   f"{variable.upper()}.grib2.bz2"
+        url = f"https://opendata.dwd.de/weather/nwp/icon-eu/grib/{hour}/{variable}/{filename}"
 
-            unzip_file(f"{ICON_switcher}_HHL_level_{i}.grib2.bz2")
-        except:
-            break
-        finally:
-            i += 1
+    return url, filename
 
-    i = 1
-    while True:
-        try:
-            ICON_switcher = "EU"
-            url = f"https://opendata.dwd.de/weather/nwp/icon-eu/grib/{hour}/hhl/icon-eu_europe_regular-lat-lon_" \
-                  f"time-invariant_{date}{hour}_{i}_HHL.grib2.bz2"
-            urllib.request.urlretrieve(url, f"{ICON_switcher}_HHL_level_{i}.grib2.bz2")
 
-            unzip_file(f"{ICON_switcher}_HHL_level_{i}.grib2.bz2")
-        except:
-            break
-        finally:
-            i += 1
+def round_down_time(time_at_point):
+    """
+    Takes current UTC and rounds down to a 3hour interval. This is the update cycle of ICON-D2.
 
-    # for i in range(1, 67):
-    #    os.remove(os.path.join(sys.path[0], f"HHL_level_{i}.grib2"))
+    :param time_at_point
+    :return rounded_time
+    :return rounder (The amount of hours by which time is rounded down. This is used to get the forecasthour)
+    """
+
+    actual_time = datetime.utcnow()
+    a = actual_time.hour
+
+    if a == 0 or a == 3 or a == 6 or a == 9 or a == 12 or a == 15 or a == 18 or a == 21:
+        rounder = 0
+    elif a == 1 or a == 4 or a == 7 or a == 10 or a == 13 or a == 16 or a == 19 or a == 22:
+        rounder = 1
+    else:
+        rounder = 2
+
+    if oldermodel:                               # if latest model is not yet available take the one from 3 hours before
+        rounder += 3
+
+    rounded_time = actual_time.replace(microsecond=0, second=0, minute=0) - timedelta(hours=rounder)
+
+    if type(time_at_point) is datetime:               # if a time is given, take forecast from nearest hour to that time
+        difference = time_at_point - rounded_time
+        difference = difference.total_seconds()//60
+        rounder = str(round(difference / 60))
+        if int(rounder) > 24 or int(rounder) < 0:
+            sys.exit("Time given is out of window")
+
+    elif actual_time.minute > 30:                       # if no time is given, just take forecast from nearest full hour
+        rounder += 1
+
+    rounded_time = str(rounded_time)
+    rounded_time = rounded_time.replace("-", "")
+    rounded_time = rounded_time.replace(":", "")
+
+    return rounded_time, rounder
 
 
 #################################
 #          Unzipping            #
 #################################
 
-
 def unzip_file(file):
+    """
+    Takes a bz2-file and unzips it
+    """
+
     filepath = os.path.join(sys.path[0], file)
 
     comp_file = bz2.BZ2File(filepath)
@@ -177,19 +208,18 @@ def unzip_file(file):
 
 
 #################################
-#        Getting index          #
-#################################
-
-def get_index_from_gribfile(file, lat, lon):
-    value = eccodes_get_nearest.main(file, lat, lon)
-    return value
-
-#################################
 #           Reading             #
 #################################
 
-
 def read_value_from_gribfile(file, index):
+    """
+    Returns the value at the given index in given file using ecCodes.
+
+    :param file
+    :param index
+    :return: value at index
+    """
+
     f = open(os.path.join(sys.path[0], file), 'rb')
     gid = codes_grib_new_from_file(f)
 
@@ -205,8 +235,10 @@ def read_value_from_gribfile(file, index):
 #      Remove old files         #
 #################################
 
-
-def remove_old_files():                     # removes any variable-file that is older than 4 hours
+def remove_old_files():
+    """
+    Removes any variable-file that is older than 4 hours
+    """
 
     for file in os.listdir('.'):
         if fnmatch.fnmatch(file, '*regular-lat-lon*'):
@@ -219,22 +251,21 @@ def remove_old_files():                     # removes any variable-file that is 
 #             Main              #
 #################################
 
-
 def main():
 
-    # download_HHL()                # This function should only be executed once at the beginning. The HHL_level files are stored locally and can be accessed anytime
+    download_HHL()
 
     variables_of_interest = ["t", "p", "qv", "u", "v", "w"]
 
-    points_in_space = ((52.31588730661351, 4.778950137403114, 0), (52.31588730661351, 4.778950137403114, 0, 2021, 12, 7, 21, 55))
+    points_in_space = ((52.31588730661351, 4.778950137403114, 0), (52.31588730661351, 4.778950137403114, 0, 2021, 12, 10, 21, 55))
     # points_in_space = points_simulator()
-
 
     for point in points_in_space:
 
         global ICON_switcher
         ICON_switcher = "D2"
 
+        # Decode point-tuples into their parameters:
         lat, lon, alt = point[0], point[1], point[2]
         if len(point) > 3:
             time_at_point = datetime(point[3], point[4], point[5], point[6], point[7])
@@ -243,6 +274,7 @@ def main():
             time_at_point = 0
             print("Current time taken")
 
+        # Check if coordinates are within ICON-D2 range. Otherwise use ICON-EU
         if 44 <= lat <= 50:
             if not 0 <= lon <= 17:
                 ICON_switcher = "EU"
