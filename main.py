@@ -142,6 +142,8 @@ def build_url(lvl, var, time_at_point):
                    f"{variable.upper()}.grib2.bz2"
         url = f"https://opendata.dwd.de/weather/nwp/icon-eu/grib/{hour}/{variable}/{filename}"
 
+    print(url)
+
     return url, filename
 
 
@@ -257,7 +259,11 @@ def main():
 
     variables_of_interest = ["t", "p", "qv", "u", "v", "w"]
 
-    points_in_space = ((52.31588730661351, 4.778950137403114, 0), (52.31588730661351, 4.778950137403114, 0, 2021, 12, 10, 21, 55))
+    """
+    Insert here the points of interest, format: latitude, longitude, altitude in meters abv sealevel.
+    Optional argument: time within the next 24h in UTC, format  YYYY, MM, DD, HH MM.
+    """
+    points_in_space = ((41.3003182174652, 2.0920081483251014, 0), (41.3003182174652, 2.0920081483251014, 0, 2021, 12, 12, 22, 55))
     # points_in_space = points_simulator()
 
     for point in points_in_space:
@@ -324,10 +330,10 @@ def points_simulator():
 
     alt = 0
     for i in range(100):
-        points_in_space.append((52.31588730661351, 4.778950137403114, alt))
-        alt += 17
-        points_in_space.append((52.31588730661351, 4.778950137403114, alt, 2021, 12, 7, 17, 55))
-        alt += 17
+        points_in_space.append((52.31016520007823, 4.775927486227643, alt))
+        alt += 15
+        points_in_space.append((52.31016520007823, 4.775927486227643, alt, 2021, 12, 13, 12, 55))
+        alt += 15
         i += 1
 
     return points_in_space
