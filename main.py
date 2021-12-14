@@ -142,8 +142,6 @@ def build_url(lvl, var, time_at_point):
                    f"{variable.upper()}.grib2.bz2"
         url = f"https://opendata.dwd.de/weather/nwp/icon-eu/grib/{hour}/{variable}/{filename}"
 
-    print(url)
-
     return url, filename
 
 
