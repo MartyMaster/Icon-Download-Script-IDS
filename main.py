@@ -7,6 +7,7 @@ import sys
 import eccodes_get_nearest
 from eccodes import *
 import fnmatch
+import csv
 
 
 #################################
@@ -230,6 +231,29 @@ def read_value_from_gribfile(file, index):
 
     return value[index]
 
+#################################
+#      Write to a csv-file      #
+#################################
+
+def write_to_csv(data):
+    header = ["Latitude", "Longitude", "geometric Altitude (m)", "UTC", "Level", "t", "p", "qv", "u", "v", "w"]
+
+    time = datetime.utcnow()
+    time = str(time.replace(microsecond=0))
+    time = time.replace("-", "_")
+    time = time.replace(":", "_")
+    time = time.replace(" ","_")
+    filename = f"{time}.csv"
+
+    with open(filename, 'w', encoding='UTF8', newline='') as f:
+        writer = csv.writer(f, delimiter=",")
+
+        # write the header
+        writer.writerow(header)
+
+        # write multiple rows
+        writer.writerows(data)
+
 
 #################################
 #      Remove old files         #
@@ -261,8 +285,10 @@ def main():
     Insert here the points of interest, format: latitude, longitude, altitude in meters abv sealevel.
     Optional argument: time within the next 24h in UTC, format  YYYY, MM, DD, HH MM.
     """
-    points_in_space = ((41.3003182174652, 2.0920081483251014, 0), (41.3003182174652, 2.0920081483251014, 0, 2021, 12, 12, 22, 55))
-    # points_in_space = points_simulator()
+    # points_in_space = ((41.3003182174652, 2.0920081483251014, 2000), (41.3003182174652, 2.0920081483251014, 1000, 2021, 12, 17, 22, 55))
+    points_in_space = points_simulator()
+
+    csvdata = []
 
     for point in points_in_space:
 
@@ -294,6 +320,8 @@ def main():
 
         print("Point:", point, "// Model taken:", ICON_switcher, "// Level:", lvl)
 
+        csvrow = [lat, lon, alt, time_at_point, lvl]
+
         for var in variables_of_interest:
 
             global oldermodel                       # used if latest model is not yet available
@@ -319,18 +347,20 @@ def main():
 
             print(f"{var} = ", value)
 
-    remove_old_files()
+            csvrow.append(value)
+
+        csvdata.append(csvrow)
+
+    # write_to_csv(csvdata)
 
 
 def points_simulator():
 
     points_in_space = []
 
-    alt = 0
-    for i in range(100):
-        points_in_space.append((52.31016520007823, 4.775927486227643, alt))
-        alt += 15
-        points_in_space.append((52.31016520007823, 4.775927486227643, alt, 2021, 12, 13, 12, 55))
+    alt = 400
+    for i in range(3):
+        points_in_space.append((47.45782369382128, 8.551156219956459, alt))
         alt += 15
         i += 1
 
