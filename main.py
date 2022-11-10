@@ -264,6 +264,10 @@ def remove_old_files():
     Removes any variable-file that is older than 4 hours
     """
 
+    warnings.warn("WARNING: You are about to remove all downloaded files aged more than 4 hours. "
+                  "If you're sure about that, uncomment the exit-statement below and run this function/script again.")
+    exit()
+
     for file in os.listdir('.'):
         if fnmatch.fnmatch(file, '*regular-lat-lon*'):
             file_age = (time.time() - os.path.getmtime(file))/3600
@@ -285,8 +289,8 @@ def main():
     Insert here the points of interest, format: latitude, longitude, altitude in meters abv sealevel.
     Optional argument: time within the next 24h in UTC, format  YYYY, MM, DD, HH MM.
     """
-    # points_in_space = ((41.3003182174652, 2.0920081483251014, 2000), (41.3003182174652, 2.0920081483251014, 1000, 2021, 12, 17, 22, 55))
-    points_in_space = points_simulator()
+    points_in_space = ((47.5642463503402, 8.0058731854457, 3115.711),)
+    # points_in_space = points_simulator()
 
     csvdata = []
 
@@ -360,7 +364,7 @@ def points_simulator():
 
     alt = 400
     for i in range(3):
-        points_in_space.append((47.45782369382128, 8.551156219956459, alt))
+        points_in_space.append((47.45782369382128, 8.551156219956459, alt, 2022, 1, 20, 19, 6))
         alt += 15
         i += 1
 
