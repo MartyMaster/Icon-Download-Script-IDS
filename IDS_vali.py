@@ -8,6 +8,7 @@ import eccodes_get_nearest
 from eccodes import *
 import fnmatch
 import csv
+import pandas as pd
 
 
 #################################
@@ -289,8 +290,9 @@ def main():
     Insert here the points of interest, format: latitude, longitude, altitude in meters abv sealevel.
     Optional argument: time within the next 24h in UTC, format  YYYY, MM, DD, HH MM.
     """
-    points_in_space = ((47.5642463503402, 8.0058731854457, 3115.711),)
+    # points_in_space = ((47.5642463503402, 8.0058731854457, 3115.711),)
     # points_in_space = points_simulator()
+    points_in_space = read_from_txt()
 
     csvdata = []
 
@@ -371,5 +373,26 @@ def points_simulator():
     return points_in_space
 
 
+def read_from_txt():
+    file = pd.read_csv("Flug1_2022_01_19.txt", sep="\t", header=0)
+
+    points_in_space = []
+    i = 0
+
+    while i < len(file.iloc[:, 0]):
+        lat = file.iloc[i][2]
+        lon = file.iloc[i][3]
+        alt = file.iloc[i][4]
+        alt_meter = alt * 0.3048
+        points_in_space.append((lat, lon, alt_meter))
+        i += 1
+    else:
+        pass
+
+    print(f"Points: {points_in_space}")
+    # return points_in_space
+
+
 if __name__ == '__main__':
-    sys.exit(main())
+    # sys.exit(main())
+    sys.exit(read_from_txt())
