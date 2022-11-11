@@ -8,6 +8,7 @@ import eccodes_get_nearest
 from eccodes import *
 import fnmatch
 import csv
+import numpy as np
 
 
 #################################
@@ -174,7 +175,7 @@ def round_down_time(time_at_point):
         difference = time_at_point - rounded_time
         difference = difference.total_seconds()//60
         rounder = str(round(difference / 60))
-        if int(rounder) > 24 or int(rounder) < 0:
+        if int(rounder) > 27 or int(rounder) < 0:
             sys.exit("Time given is out of window")
 
     elif actual_time.minute > 30:                       # if no time is given, just take forecast from nearest full hour
@@ -289,7 +290,7 @@ def main():
     Insert here the points of interest, format: latitude, longitude, altitude in meters abv sealevel.
     Optional argument: time within the next 24h in UTC, format  YYYY, MM, DD, HH MM.
     """
-    points_in_space = ((47.5642463503402, 8.0058731854457, 3115.711),)
+    points_in_space = ((47.5642463503402, 8.0058731854457, 0),)
     # points_in_space = points_simulator()
 
     csvdata = []
@@ -305,7 +306,7 @@ def main():
             time_at_point = datetime(point[3], point[4], point[5], point[6], point[7])
             print(time_at_point)
         else:
-            time_at_point = 0
+            time_at_point = datetime.utcnow()
             print("Current time taken")
 
         # Check if coordinates are within ICON-D2 range. Otherwise use ICON-EU
@@ -327,27 +328,35 @@ def main():
         csvrow = [lat, lon, alt, time_at_point, lvl]
 
         for var in variables_of_interest:
+            value = []
+            time_index = []
 
-            global oldermodel                       # used if latest model is not yet available
-            oldermodel = False
+            for i in range(-3, 3):
+                time_at_point_calc = time_at_point + timedelta(hours=i)
+                time_index.append(i)
 
-            try:                                                       # check if file is already present
-                filename = build_url(lvl, var, time_at_point)[1][:-4]
-                value = read_value_from_gribfile(filename, index)
+                global oldermodel                       # used if latest model is not yet available
+                oldermodel = False
 
-            except:                                                    # if not, check if file of older model is present
-                try:
-                    oldermodel = True
+                try:                                                       # check if file is already present
+                    filename = build_url(lvl, var, time_at_point_calc)[1][:-4]
+                    value.append(read_value_from_gribfile(filename, index))
 
-                    filename = build_url(lvl, var, time_at_point)[1][:-4]
-                    value = read_value_from_gribfile(filename, index)
+                except:                                                    # if not, check if file of older model is present
+                    try:
+                        oldermodel = True
 
-                except:                                                # if both files are not yet present, download
-                    oldermodel = False
+                        filename = build_url(lvl, var, time_at_point_calc)[1][:-4]
+                        value.append(read_value_from_gribfile(filename, index))
 
-                    download(lvl, var, time_at_point)
-                    filename = build_url(lvl, var, time_at_point)[1][:-4]
-                    value = read_value_from_gribfile(filename, index)
+                    except:                                                # if both files are not yet present, download
+                        oldermodel = False
+
+                        download(lvl, var, time_at_point_calc)
+                        filename = build_url(lvl, var, time_at_point_calc)[1][:-4]
+                        value.append(read_value_from_gribfile(filename, index))
+
+            # poly_value = np.polyfit(time_index, value, deg=3)
 
             print(f"{var} = ", value)
 
