@@ -367,7 +367,6 @@ def main():
     # write_to_csv(csvdata)
 
 
-
 def points_simulator():
 
     points_in_space = []
