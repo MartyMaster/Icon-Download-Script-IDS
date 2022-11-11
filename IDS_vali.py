@@ -290,9 +290,9 @@ def main():
     Insert here the points of interest, format: latitude, longitude, altitude in meters abv sealevel.
     Optional argument: time within the next 24h in UTC, format  YYYY, MM, DD, HH MM.
     """
-    # points_in_space = ((47.5642463503402, 8.0058731854457, 3115.711),)
+    points_in_space = ((47.5642463503402, 8.0058731854457, 3115.711),)
     # points_in_space = points_simulator()
-    points_in_space = read_from_txt()
+    # points_in_space = read_from_txt()
 
     csvdata = []
 
@@ -380,19 +380,27 @@ def read_from_txt():
     i = 0
 
     while i < len(file.iloc[:, 0]):
-        lat = file.iloc[i][2]
-        lon = file.iloc[i][3]
-        alt = file.iloc[i][4]
+        lat = file.iloc[i]["Best Available Latitude (deg)"]
+        lon = file.iloc[i]["Best Available Longitude (deg)"]
+        alt = file.iloc[i]["Geometric Altitude (ft)"]
         alt_meter = alt * 0.3048
-        points_in_space.append((lat, lon, alt_meter))
+        year = 2022
+        month = 11
+        day = 11
+        time_hour = round(file.iloc[i]["GMT (hrs)"], 2)
+        hours = int(time_hour)
+        minutes = int((time_hour * 60) % 60)
+
+        if 44 <= lat <= 50 and 6 <= lon <= 10 and 380 <= alt_meter <= 3500 and time_hour <= 24:
+            points_in_space.append((lat, lon, alt_meter, year, month, day, hours, minutes))
         i += 1
     else:
         pass
 
-    print(f"Points: {points_in_space}")
-    # return points_in_space
+    # print(f"Points: {points_in_space}")
+    return points_in_space
 
 
 if __name__ == '__main__':
-    # sys.exit(main())
-    sys.exit(read_from_txt())
+    sys.exit(main())
+    # sys.exit(read_from_txt())
