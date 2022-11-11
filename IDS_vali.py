@@ -113,13 +113,13 @@ def download(lvl, var, time_at_point):
     """
 
     try:
-        url, filename = build_url(lvl, var, time_at_point)
+        url, filename = build_url(lvl, var, time_at_point)[:2]
         urllib.request.urlretrieve(url, filename)
     except:
         global oldermodel
         oldermodel = True
 
-        url, filename = build_url(lvl, var, time_at_point)
+        url, filename = build_url(lvl, var, time_at_point)[:2]
         urllib.request.urlretrieve(url, filename)
 
     unzip_file(filename)
@@ -144,7 +144,7 @@ def build_url(lvl, var, time_at_point):
                    f"{variable.upper()}.grib2.bz2"
         url = f"https://opendata.dwd.de/weather/nwp/icon-eu/grib/{hour}/{variable}/{filename}"
 
-    return url, filename
+    return url, filename, date, hour
 
 
 def round_down_time(time_at_point):
@@ -197,7 +197,7 @@ def unzip_file(file):
     Takes a bz2-file and unzips it
     """
 
-    filepath = os.path.join(sys.path[0], file)
+    filepath = os.path.join(os.getcwd(), file)
 
     comp_file = bz2.BZ2File(filepath)
 
@@ -222,7 +222,7 @@ def read_value_from_gribfile(file, index):
     :return: value at index
     """
 
-    f = open(os.path.join(sys.path[0], file), 'rb')
+    f = open(os.path.join(os.getcwd(), file), 'rb')
     gid = codes_grib_new_from_file(f)
 
     value = codes_get_values(gid)
@@ -290,11 +290,12 @@ def main():
     Insert here the points of interest, format: latitude, longitude, altitude in meters abv sealevel.
     Optional argument: time within the next 24h in UTC, format  YYYY, MM, DD, HH MM.
     """
-    points_in_space = ((47.5642463503402, 8.0058731854457, 3115.711),)
+    points_in_space = ((47.5642463503402, 8.0058731854457, 3115.711, 2022, 11, 12, 14, 15),)
     # points_in_space = points_simulator()
     # points_in_space = read_from_txt()
 
     csvdata = []
+    parentdir = os.getcwd()
 
     for point in points_in_space:
 
@@ -330,26 +331,51 @@ def main():
 
         for var in variables_of_interest:
 
+            os.chdir(parentdir)
+
             global oldermodel                       # used if latest model is not yet available
             oldermodel = False
 
             try:                                                       # check if file is already present
-                filename = build_url(lvl, var, time_at_point)[1][:-4]
+                filename, day, hour = build_url(lvl, var, time_at_point)[1:4]
+                filename = filename[:-4]
+                subdir = day + "_" + hour
+                filedir = os.path.join(parentdir, subdir)
+                os.chdir(filedir)
                 value = read_value_from_gribfile(filename, index)
+                os.chdir(parentdir)
 
             except:                                                    # if not, check if file of older model is present
                 try:
                     oldermodel = True
 
-                    filename = build_url(lvl, var, time_at_point)[1][:-4]
+                    os.chdir(parentdir)
+                    filename, day, hour = build_url(lvl, var, time_at_point)[1:4]
+                    filename = filename[:-4]
+                    subdir = day + "_" + hour
+                    filedir = os.path.join(parentdir, subdir)
+                    os.chdir(filedir)
                     value = read_value_from_gribfile(filename, index)
+                    os.chdir(parentdir)
 
                 except:                                                # if both files are not yet present, download
                     oldermodel = False
 
+                    os.chdir(parentdir)
+                    filename, day, hour = build_url(lvl, var, time_at_point)[1:4]
+                    filename = filename[:-4]
+                    subdir = day + "_" + hour
+                    filedir = os.path.join(parentdir, subdir)
+
+                    try:
+                        os.mkdir(filedir, mode=0o777)
+                    except:
+                        pass
+
+                    os.chdir(filedir)
                     download(lvl, var, time_at_point)
-                    filename = build_url(lvl, var, time_at_point)[1][:-4]
                     value = read_value_from_gribfile(filename, index)
+                    os.chdir(parentdir)
 
             print(f"{var} = ", value)
 
