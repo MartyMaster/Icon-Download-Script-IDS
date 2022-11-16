@@ -119,7 +119,11 @@ def download(lvl, var, time_at_point):
         global oldermodel
         oldermodel = True
 
-        url, filename = build_url(lvl, var, time_at_point)[:2]
+        url, filename, day, hour = build_url(lvl, var, time_at_point)
+        subdir = day + "_" + hour
+        filedir = os.path.join(parentdir, subdir)
+        os.chdir(filedir)
+
         urllib.request.urlretrieve(url, filename)
 
     unzip_file(filename)
@@ -295,6 +299,7 @@ def main():
     # points_in_space = read_from_txt()
 
     csvdata = []
+    global parentdir
     parentdir = os.getcwd()
 
     for point in points_in_space:
@@ -383,7 +388,12 @@ def main():
 
         csvdata.append(csvrow)
 
-    # write_to_csv(csvdata)
+    write_to_csv(csvdata)
+
+
+#################################
+# Functions used for validation #
+#################################
 
 
 def points_simulator():
