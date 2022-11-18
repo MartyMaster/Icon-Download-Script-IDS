@@ -271,6 +271,7 @@ def write_to_csv(data, flightnr):
         # write multiple rows
         writer.writerows(data)
 
+    print(f"flight{flightnr} saved into csv")
     os.chdir(parentdir)
 
 #################################
@@ -324,10 +325,10 @@ def main(flightrows, flightnr):
         lat, lon, alt = point[0], point[1], point[2]
         if len(point) > 3:
             time_at_point = datetime(point[3], point[4], point[5], point[6], point[7])
-            print(time_at_point)
+            # print(time_at_point)
         else:
             time_at_point = 0
-            print("Current time taken")
+            # print("Current time taken")
 
         # Check if coordinates are within ICON-D2 range. Otherwise use ICON-EU
         if 44 <= lat <= 50:
@@ -399,7 +400,7 @@ def main(flightrows, flightnr):
                     value = read_value_from_gribfile(filename, index)
                     os.chdir(parentdir)
 
-            print(f"{var} = ", value)
+            # print(f"{var} = ", value)
 
             csvrow.append(value)
 
