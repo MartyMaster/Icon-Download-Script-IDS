@@ -240,7 +240,7 @@ def read_value_from_gribfile(file, index):
 #      Write to a csv-file      #
 #################################
 
-def write_to_csv(data):
+def write_to_csv(data, flightnr):
     header = ["Latitude", "Longitude", "geometric Altitude (m)", "UTC", "Level", "t", "p", "qv", "u", "v", "w"]
 
     time = datetime.utcnow()
@@ -248,7 +248,7 @@ def write_to_csv(data):
     time = time.replace("-", "_")
     time = time.replace(":", "_")
     time = time.replace(" ","_")
-    filename = f"{time}.csv"
+    filename = f"{flightnr}_{time}.csv"
 
     with open(filename, 'w', encoding='UTF8', newline='') as f:
         writer = csv.writer(f, delimiter=",")
@@ -284,7 +284,7 @@ def remove_old_files():
 #             Main              #
 #################################
 
-def main():
+def main(flightrows, flightnr):
 
     download_HHL()
 
@@ -294,9 +294,11 @@ def main():
     Insert here the points of interest, format: latitude, longitude, altitude in meters abv sealevel.
     Optional argument: time within the next 24h in UTC, format  YYYY, MM, DD, HH MM.
     """
-    points_in_space = ((47.5642463503402, 8.0058731854457, 3115.711, 2022, 11, 12, 14, 15),)
+    points_in_space = ((47.5642463503402, 8.0058731854457, 3115.711, 2022, 11, 17, 14, 15),)
     # points_in_space = points_simulator()
-    # points_in_space = read_from_txt()
+    points_in_space = read_from_txt(flightrows)
+
+    sys.exit(0)
 
     csvdata = []
     global parentdir
@@ -388,7 +390,7 @@ def main():
 
         csvdata.append(csvrow)
 
-    write_to_csv(csvdata)
+    write_to_csv(csvdata, flightnr)
 
 
 #################################
@@ -409,34 +411,47 @@ def points_simulator():
     return points_in_space
 
 
-def read_from_txt():
-    file = pd.read_csv("Flug1_2022_01_19.txt", sep="\t", header=0)
+def read_from_txt(flightrows):
 
     points_in_space = []
-    i = 0
 
-    while i < len(file.iloc[:, 0]):
-        lat = file.iloc[i]["Best Available Latitude (deg)"]
-        lon = file.iloc[i]["Best Available Longitude (deg)"]
-        alt = file.iloc[i]["Geometric Altitude (ft)"]
+    for index, row in flightrows.iterrows():
+        lat = row["P860: Latitude (degrees)"]
+        lon = row["P860: Longitude (degrees)"]
+        alt = row["P860: GPS Altitude (ft)"]
         alt_meter = alt * 0.3048
+        date = row["Flight Date (Exact) (UTC)"]
         year = 2022
-        month = 11
-        day = 11
-        time_hour = round(file.iloc[i]["GMT (hrs)"], 2)
+        if "Sep" in date:
+            month = 9
+        elif "Oct" in date:
+            month = 10
+        if "Nov" in date:
+            month = 11
+        day = int(date.partition(" ")[0])
+        time_hour = round(row["P860: GMT"], 2)
         hours = int(time_hour)
         minutes = int((time_hour * 60) % 60)
 
-        if 44 <= lat <= 50 and 6 <= lon <= 10 and 380 <= alt_meter <= 3500 and time_hour <= 24:
+        if 44 <= lat <= 50 and 6 <= lon <= 10 and 380 <= alt_meter <= 4000 and time_hour <= 24:
             points_in_space.append((lat, lon, alt_meter, year, month, day, hours, minutes))
-        i += 1
-    else:
-        pass
 
-    # print(f"Points: {points_in_space}")
     return points_in_space
 
 
+def main_looper():
+    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_5.txt", sep="\t", header=0)
+
+    flightlist = []
+    for flightnr in file["Flight Record"]:
+        if flightnr not in flightlist:
+            flightlist.append(flightnr)
+
+    for flightnr in flightlist:
+        flightrows = file.loc[file["Flight Record"] == flightnr]
+        main(flightrows, flightnr)
+
+
 if __name__ == '__main__':
-    sys.exit(main())
-    # sys.exit(read_from_txt())
+    # sys.exit(main())
+    sys.exit(main_looper())
