@@ -122,8 +122,13 @@ def download(lvl, var, time_at_point):
         url, filename, day, hour = build_url(lvl, var, time_at_point)
         subdir = day + "_" + hour
         filedir = os.path.join(parentdir, subdir)
-        os.chdir(filedir)
 
+        try:
+            os.mkdir(filedir, mode=0o777)
+        except:
+            pass
+
+        os.chdir(filedir)
         urllib.request.urlretrieve(url, filename)
 
     unzip_file(filename)
@@ -161,6 +166,10 @@ def round_down_time(time_at_point):
     """
 
     actual_time = datetime.utcnow()
+
+    # CAUTION: following line might lead to outdated information an shall only used for this validation purpose
+    actual_time = time_at_point - timedelta(hours=1)
+
     a = actual_time.hour
 
     if a == 0 or a == 3 or a == 6 or a == 9 or a == 12 or a == 15 or a == 18 or a == 21:
@@ -248,7 +257,10 @@ def write_to_csv(data, flightnr):
     time = time.replace("-", "_")
     time = time.replace(":", "_")
     time = time.replace(" ","_")
-    filename = f"{flightnr}_{time}.csv"
+    filename = f"flight{flightnr}_{time}.csv"
+
+    filedir = os.path.join(parentdir, "IDSdata")
+    os.chdir(filedir)
 
     with open(filename, 'w', encoding='UTF8', newline='') as f:
         writer = csv.writer(f, delimiter=",")
@@ -259,6 +271,7 @@ def write_to_csv(data, flightnr):
         # write multiple rows
         writer.writerows(data)
 
+    os.chdir(parentdir)
 
 #################################
 #      Remove old files         #
@@ -297,8 +310,6 @@ def main(flightrows, flightnr):
     points_in_space = ((47.5642463503402, 8.0058731854457, 3115.711, 2022, 11, 17, 14, 15),)
     # points_in_space = points_simulator()
     points_in_space = read_from_txt(flightrows)
-
-    sys.exit(0)
 
     csvdata = []
     global parentdir
@@ -345,10 +356,14 @@ def main(flightrows, flightnr):
 
             try:                                                       # check if file is already present
                 filename, day, hour = build_url(lvl, var, time_at_point)[1:4]
-                filename = filename[:-4]
                 subdir = day + "_" + hour
                 filedir = os.path.join(parentdir, subdir)
                 os.chdir(filedir)
+                try:
+                    unzip_file(filename)
+                except:
+                    pass
+                filename = filename[:-4]
                 value = read_value_from_gribfile(filename, index)
                 os.chdir(parentdir)
 
