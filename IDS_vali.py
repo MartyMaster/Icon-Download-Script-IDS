@@ -257,7 +257,8 @@ def write_to_csv(data, flightnr):
     time = time.replace("-", "_")
     time = time.replace(":", "_")
     time = time.replace(" ","_")
-    filename = f"flight{flightnr}_minus1h_{time}.csv"
+
+    filename = f"flight{flightnr}_IDSminus1h.csv"
 
     filedir = os.path.join(parentdir, "IDSdata")
     os.chdir(filedir)
