@@ -250,7 +250,7 @@ def read_value_from_gribfile(file, index):
 #################################
 
 def write_to_csv(data, flightnr):
-    header = ["Latitude", "Longitude", "geometric Altitude (m)", "UTC", "Level", "t", "p", "qv", "u", "v", "w"]
+    header = ["Latitude", "Longitude", "geometric Altitude (m)", "UTC", "exactGMT", "Level", "t", "p", "qv", "u", "v", "w"]
 
     time = datetime.utcnow()
     time = str(time.replace(microsecond=0))
@@ -323,7 +323,7 @@ def main(flightrows, flightnr):
         ICON_switcher = "D2"
 
         # Decode point-tuples into their parameters:
-        lat, lon, alt = point[0], point[1], point[2]
+        lat, lon, alt, exactGMT = point[0], point[1], point[2], point[8]
         if len(point) > 3:
             time_at_point = datetime(point[3], point[4], point[5], point[6], point[7])
             # print(time_at_point)
@@ -347,7 +347,7 @@ def main(flightrows, flightnr):
 
         print("Point:", point, "// Model taken:", ICON_switcher, "// Level:", lvl)
 
-        csvrow = [lat, lon, alt, time_at_point, lvl]
+        csvrow = [lat, lon, alt, time_at_point, exactGMT, lvl]
 
         for var in variables_of_interest:
 
@@ -431,7 +431,7 @@ def points_simulator():
 def read_from_txt(flightrows):
 
     points_in_space = []
-    flightrows = flightrows.sort_values("P860: GPS Altitude (ft)", ascending=False)
+    flightrows = flightrows.sort_values("P860: GMT", ascending=True)
 
     for index, row in flightrows.iterrows():
         lat = row["P860: Latitude (degrees)"]
@@ -450,15 +450,16 @@ def read_from_txt(flightrows):
         time_hour = round(row["P860: GMT"], 2)
         hours = int(time_hour)
         minutes = int((time_hour * 60) % 60)
+        exactGMT = row["P860: GMT"]
 
         if 44 <= lat <= 50 and 6 <= lon <= 10 and 380 <= alt_meter <= 4000 and time_hour <= 24:
-            points_in_space.append((lat, lon, alt_meter, year, month, day, hours, minutes))
+            points_in_space.append((lat, lon, alt_meter, year, month, day, hours, minutes, exactGMT))
 
     return points_in_space
 
 
 def main_looper():
-    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_2.txt", sep="\t", header=0)
+    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_5.txt", sep="\t", header=0)
 
     flightlist = []
     for flightnr in file["Flight Record"]:
