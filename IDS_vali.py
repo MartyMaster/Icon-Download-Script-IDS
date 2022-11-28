@@ -431,6 +431,7 @@ def points_simulator():
 def read_from_txt(flightrows):
 
     points_in_space = []
+    flightrows = flightrows.sort_values("P860: GPS Altitude (ft)", ascending=False)
 
     for index, row in flightrows.iterrows():
         lat = row["P860: Latitude (degrees)"]
@@ -457,7 +458,7 @@ def read_from_txt(flightrows):
 
 
 def main_looper():
-    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_1.txt", sep="\t", header=0)
+    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_2.txt", sep="\t", header=0)
 
     flightlist = []
     for flightnr in file["Flight Record"]:
