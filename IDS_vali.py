@@ -168,7 +168,7 @@ def round_down_time(time_at_point):
     actual_time = datetime.utcnow()
 
     # CAUTION: following line might lead to outdated information an shall only used for this validation purpose
-    actual_time = time_at_point - timedelta(hours=1)
+    actual_time = time_at_point - timedelta(hours=4)
 
     a = actual_time.hour
 
@@ -258,7 +258,7 @@ def write_to_csv(data, flightnr):
     time = time.replace(":", "_")
     time = time.replace(" ","_")
 
-    filename = f"flight{flightnr}_IDSminus1h.csv"
+    filename = f"flight{flightnr}_IDSminus4h.csv"
 
     filedir = os.path.join(parentdir, "IDSdata")
     os.chdir(filedir)
@@ -459,7 +459,7 @@ def read_from_txt(flightrows):
 
 
 def main_looper():
-    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_2.txt", sep="\t", header=0)
+    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_5.txt", sep="\t", header=0)
 
     flightlist = []
     for flightnr in file["Flight Record"]:
@@ -470,6 +470,7 @@ def main_looper():
         flightrows = file.loc[file["Flight Record"] == flightnr]
         main(flightrows, flightnr)
 
+    print(f"IDS finished at {datetime.utcnow()}")
 
 if __name__ == '__main__':
     # sys.exit(main())
