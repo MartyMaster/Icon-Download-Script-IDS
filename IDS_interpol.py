@@ -8,6 +8,7 @@ import eccodes_get_nearest
 from eccodes import *
 import fnmatch
 import csv
+from sklearn.linear_model import LinearRegression
 import numpy as np
 
 
@@ -100,7 +101,22 @@ def get_modellevel_from_altitude(index, alt):
 
     level = min(range(len(HFLs)), key=lambda i: abs(HFLs[i] - alt)) + 1
 
-    return level
+    level_list = []
+    alt_list = []
+
+    for i in range(-3, 4):
+        new_lvl = level + i
+        if ICON_switcher == "D2":
+            if 20 <= new_lvl <= 65:
+                level_list.append(new_lvl)
+        elif ICON_switcher == "EU":
+            if 20 <= new_lvl <= 60:
+                level_list.append(new_lvl)
+
+    for i in level_list:
+        alt_list.append(HFLs[i-1])
+
+    return level, level_list, alt_list
 
 
 #################################
@@ -321,50 +337,49 @@ def main():
 
         index = get_index_from_gribfile(f"{ICON_switcher}_HHL_level_1.grib2", lat, lon)
 
-        lvl = get_modellevel_from_altitude(index, alt)
+        lvl, level_list, alt_list = get_modellevel_from_altitude(index, alt)
 
         print("Point:", point, "// Model taken:", ICON_switcher, "// Level:", lvl)
 
         csvrow = [lat, lon, alt, time_at_point, lvl]
 
         for var in variables_of_interest:
-            value = []
-            time_index = []
 
-            for i in range(-3, 3):
-                time_at_point_calc = time_at_point + timedelta(hours=i)
-                time_index.append(i)
+            value_list = []
+
+            for level in level_list:
 
                 global oldermodel                       # used if latest model is not yet available
                 oldermodel = False
 
                 try:                                                       # check if file is already present
-                    filename = build_url(lvl, var, time_at_point_calc)[1][:-4]
-                    value.append(read_value_from_gribfile(filename, index))
+                    filename = build_url(level, var, time_at_point)[1][:-4]
+                    value_list.append(read_value_from_gribfile(filename, index))
 
                 except:                                                    # if not, check if file of older model is present
                     try:
                         oldermodel = True
 
-                        filename = build_url(lvl, var, time_at_point_calc)[1][:-4]
-                        value.append(read_value_from_gribfile(filename, index))
+                        filename = build_url(level, var, time_at_point)[1][:-4]
+                        value_list.append(read_value_from_gribfile(filename, index))
 
                     except:                                                # if both files are not yet present, download
                         oldermodel = False
 
-                        download(lvl, var, time_at_point_calc)
-                        filename = build_url(lvl, var, time_at_point_calc)[1][:-4]
-                        value.append(read_value_from_gribfile(filename, index))
+                        download(level, var, time_at_point)
+                        filename = build_url(level, var, time_at_point)[1][:-4]
+                        value_list.append(read_value_from_gribfile(filename, index))
 
-            # poly_value = np.polyfit(time_index, value, deg=3)
+            levelmodel = LinearRegression().fit(np.array(alt_list).reshape((-1, 1)), np.array(value_list))
+            value = float(levelmodel.predict(np.array(alt).reshape(1, -1)))
 
-            print(f"{var} = ", value)
+            print(f"{var} = ", value, ", interpolated from list: ", value_list)
 
             csvrow.append(value)
 
         csvdata.append(csvrow)
 
-    # write_to_csv(csvdata)
+    write_to_csv(csvdata)
 
 
 def points_simulator():
@@ -373,8 +388,8 @@ def points_simulator():
 
     alt = 400
     for i in range(3):
-        points_in_space.append((47.45782369382128, 8.551156219956459, alt, 2022, 1, 20, 19, 6))
-        alt += 15
+        points_in_space.append((47.45782369382128, 8.551156219956459, alt))
+        alt += 500
         i += 1
 
     return points_in_space
