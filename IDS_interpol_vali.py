@@ -481,7 +481,9 @@ def read_from_txt(flightrows):
 
 
 def main_looper():
-    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_5.txt", sep="\t", header=0)
+    starttime = datetime.utcnow()
+
+    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_4.txt", sep="\t", header=0)
 
     flightlist = []
     for flightnr in file["Flight Record"]:
@@ -492,7 +494,7 @@ def main_looper():
         flightrows = file.loc[file["Flight Record"] == flightnr]
         main(flightrows, flightnr)
 
-    print(f"IDS finished at {datetime.utcnow()}")
+    print(f"IDS finished at {datetime.utcnow()}, start time was {starttime}")
 
 
 if __name__ == '__main__':
