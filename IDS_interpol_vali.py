@@ -9,7 +9,8 @@ from eccodes import *
 import fnmatch
 import csv
 import pandas as pd
-
+from sklearn.linear_model import LinearRegression
+import numpy as np
 
 #################################
 #         Download HHL          #
@@ -100,7 +101,22 @@ def get_modellevel_from_altitude(index, alt):
 
     level = min(range(len(HFLs)), key=lambda i: abs(HFLs[i] - alt)) + 1
 
-    return level
+    level_list = []
+    alt_list = []
+
+    for i in range(-3, 4):
+        new_lvl = level + i
+        if ICON_switcher == "D2":
+            if 20 <= new_lvl <= 65:
+                level_list.append(new_lvl)
+        elif ICON_switcher == "EU":
+            if 20 <= new_lvl <= 60:
+                level_list.append(new_lvl)
+
+    for i in level_list:
+        alt_list.append(HFLs[i-1])
+
+    return level, level_list, alt_list
 
 
 #################################
@@ -168,7 +184,7 @@ def round_down_time(time_at_point):
     actual_time = datetime.utcnow()
 
     # CAUTION: following line might lead to outdated information an shall only used for this validation purpose
-    actual_time = time_at_point - timedelta(hours=4)
+    actual_time = time_at_point - timedelta(hours=1)
 
     a = actual_time.hour
 
@@ -258,7 +274,7 @@ def write_to_csv(data, flightnr):
     time = time.replace(":", "_")
     time = time.replace(" ","_")
 
-    filename = f"flight{flightnr}_IDSminus4h.csv"
+    filename = f"flight{flightnr}_IDSminus1h_interpol_lvl.csv"
 
     filedir = os.path.join(parentdir, "IDSdata")
     os.chdir(filedir)
@@ -343,7 +359,7 @@ def main(flightrows, flightnr):
 
         index = get_index_from_gribfile(f"{ICON_switcher}_HHL_level_1.grib2", lat, lon)
 
-        lvl = get_modellevel_from_altitude(index, alt)
+        lvl, level_list, alt_list = get_modellevel_from_altitude(index, alt)
 
         print("Point:", point, "// Model taken:", ICON_switcher, "// Level:", lvl)
 
@@ -353,55 +369,61 @@ def main(flightrows, flightnr):
 
             os.chdir(parentdir)
 
-            global oldermodel                       # used if latest model is not yet available
-            oldermodel = False
+            value_list = []
 
-            try:                                                       # check if file is already present
-                filename, day, hour = build_url(lvl, var, time_at_point)[1:4]
-                subdir = day + "_" + hour
-                filedir = os.path.join(parentdir, subdir)
-                os.chdir(filedir)
-                try:
-                    unzip_file(filename)
-                except:
-                    pass
-                filename = filename[:-4]
-                value = read_value_from_gribfile(filename, index)
-                os.chdir(parentdir)
+            for level in level_list:
 
-            except:                                                    # if not, check if file of older model is present
-                try:
-                    oldermodel = True
+                global oldermodel                       # used if latest model is not yet available
+                oldermodel = False
 
-                    os.chdir(parentdir)
-                    filename, day, hour = build_url(lvl, var, time_at_point)[1:4]
-                    filename = filename[:-4]
+                try:                                                       # check if file is already present
+                    filename, day, hour = build_url(level, var, time_at_point)[1:4]
                     subdir = day + "_" + hour
                     filedir = os.path.join(parentdir, subdir)
                     os.chdir(filedir)
-                    value = read_value_from_gribfile(filename, index)
-                    os.chdir(parentdir)
-
-                except:                                                # if both files are not yet present, download
-                    oldermodel = False
-
-                    os.chdir(parentdir)
-                    filename, day, hour = build_url(lvl, var, time_at_point)[1:4]
-                    filename = filename[:-4]
-                    subdir = day + "_" + hour
-                    filedir = os.path.join(parentdir, subdir)
-
                     try:
-                        os.mkdir(filedir, mode=0o777)
+                        unzip_file(filename)
                     except:
                         pass
-
-                    os.chdir(filedir)
-                    download(lvl, var, time_at_point)
-                    value = read_value_from_gribfile(filename, index)
+                    filename = filename[:-4]
+                    value_list.append(read_value_from_gribfile(filename, index))
                     os.chdir(parentdir)
 
-            # print(f"{var} = ", value)
+                except:                                                    # if not, check if file of older model is present
+                    try:
+                        oldermodel = True
+
+                        os.chdir(parentdir)
+                        filename, day, hour = build_url(level, var, time_at_point)[1:4]
+                        filename = filename[:-4]
+                        subdir = day + "_" + hour
+                        filedir = os.path.join(parentdir, subdir)
+                        os.chdir(filedir)
+                        value_list.append(read_value_from_gribfile(filename, index))
+                        os.chdir(parentdir)
+
+                    except:                                                # if both files are not yet present, download
+                        oldermodel = False
+
+                        os.chdir(parentdir)
+                        filename, day, hour = build_url(level, var, time_at_point)[1:4]
+                        filename = filename[:-4]
+                        subdir = day + "_" + hour
+                        filedir = os.path.join(parentdir, subdir)
+
+                        try:
+                            os.mkdir(filedir, mode=0o777)
+                        except:
+                            pass
+
+                        os.chdir(filedir)
+                        download(level, var, time_at_point)
+                        value_list.append(read_value_from_gribfile(filename, index))
+                        os.chdir(parentdir)
+
+            levelmodel = LinearRegression().fit(np.array(alt_list).reshape((-1, 1)), np.array(value_list))
+            value = float(levelmodel.predict(np.array(alt).reshape(1, -1)))
+            # print(f"{var} = ", value, ", interpolated from list: ", value_list)
 
             csvrow.append(value)
 
@@ -459,7 +481,7 @@ def read_from_txt(flightrows):
 
 
 def main_looper():
-    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_2.txt", sep="\t", header=0)
+    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_5.txt", sep="\t", header=0)
 
     flightlist = []
     for flightnr in file["Flight Record"]:
@@ -471,6 +493,7 @@ def main_looper():
         main(flightrows, flightnr)
 
     print(f"IDS finished at {datetime.utcnow()}")
+
 
 if __name__ == '__main__':
     # sys.exit(main())
