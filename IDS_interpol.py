@@ -8,7 +8,6 @@ import eccodes_get_nearest
 from eccodes import *
 import fnmatch
 import csv
-from sklearn.linear_model import LinearRegression
 import numpy as np
 
 
@@ -101,17 +100,20 @@ def get_modellevel_from_altitude(index, alt):
 
     level = min(range(len(HFLs)), key=lambda i: abs(HFLs[i] - alt)) + 1
 
-    level_list = []
+    level_list = [level]
     alt_list = []
 
-    for i in range(-3, 4):
-        new_lvl = level + i
-        if ICON_switcher == "D2":
-            if 20 <= new_lvl <= 65:
-                level_list.append(new_lvl)
-        elif ICON_switcher == "EU":
-            if 20 <= new_lvl <= 60:
-                level_list.append(new_lvl)
+    if level == 1:                                         # add levels above or below for lateral linear interpolation
+        level_list.append(2)
+    elif level == 65 and ICON_switcher == "D2":
+        level_list.append(64)
+    elif level == 60 and ICON_switcher == "EU":
+        level_list.append(59)
+    else:
+        if (HFLs[level-1] - alt) < 0:
+            level_list.append(level - 1)
+        else:
+            level_list.append(level + 1)
 
     for i in level_list:
         alt_list.append(HFLs[i-1])
@@ -370,8 +372,10 @@ def main():
                         filename = build_url(level, var, time_at_point)[1][:-4]
                         value_list.append(read_value_from_gribfile(filename, index))
 
-            levelmodel = LinearRegression().fit(np.array(alt_list).reshape((-1, 1)), np.array(value_list))
-            value = float(levelmodel.predict(np.array(alt).reshape(1, -1)))
+                if np.all(np.diff(alt_list) > 0):
+                    value = np.interp(alt, alt_list, value_list)            # lateral inerpolation of the 2 values
+                else:
+                    value = np.interp(alt, alt_list[::-1], value_list[::-1])   # x-axis must always be increasing for np.interp
 
             print(f"{var} = ", value, ", interpolated from list: ", value_list)
 
