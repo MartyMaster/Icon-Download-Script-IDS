@@ -466,7 +466,7 @@ def main(flightrows, flightnr):
                 denominator += (1 / act_distances[i])
             value = nominator / denominator
 
-            print(f"{var} = ", value, ", interpolated from list: ", value_list)
+            # print(f"{var} = ", value, ", interpolated from list: ", value_list)
 
             csvrow.append(value)
 
