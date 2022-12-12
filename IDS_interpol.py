@@ -8,7 +8,7 @@ import eccodes_get_nearest
 from eccodes import *
 import fnmatch
 import csv
-import numpy as np
+import math
 
 
 #################################
@@ -63,8 +63,23 @@ def get_index_from_gribfile(file, lat, lon):
     """
     Calls eccodes_get_nearest.py which gives the index of the nearest point for any lat-lon-coordinate.
     """
-    index = eccodes_get_nearest.main(file, lat, lon)
-    return index
+    nearest = eccodes_get_nearest.main(file, lat, lon)
+
+    distances = []
+    indices = []
+    for pt in nearest:
+        distances.append(pt.distance)
+        indices.append(pt.index)
+
+    nearest = sorted(zip(distances, indices))
+
+    distances = []
+    indices = []
+    for pt in nearest:
+        distances.append(pt[0])
+        indices.append(pt[1])
+
+    return distances, indices
 
 
 #################################
@@ -337,9 +352,18 @@ def main():
         else:
             ICON_switcher = "EU"
 
-        index = get_index_from_gribfile(f"{ICON_switcher}_HHL_level_1.grib2", lat, lon)
+        # lat,lon,alt,index,lvl describe the actual point. All lists starting with grid... describe the grid points
+        griddistances, gridindices = get_index_from_gribfile(f"{ICON_switcher}_HHL_level_1.grib2", lat, lon)
+        index = gridindices[0]
 
         lvl, level_list, alt_list = get_modellevel_from_altitude(index, alt)
+
+        gridalts = []
+        for gridlevel in level_list:
+            for gridindex in gridindices:                                   # calculate alt of full levels from HHLs
+                gridalt1 = read_value_from_gribfile(f"{ICON_switcher}_HHL_level_{gridlevel}.grib2", gridindex)
+                gridalt2 = read_value_from_gribfile(f"{ICON_switcher}_HHL_level_{gridlevel + 1}.grib2", gridindex)
+                gridalts.append((gridalt1 + gridalt2)/2)
 
         print("Point:", point, "// Model taken:", ICON_switcher, "// Level:", lvl)
 
@@ -356,26 +380,38 @@ def main():
 
                 try:                                                       # check if file is already present
                     filename = build_url(level, var, time_at_point)[1][:-4]
-                    value_list.append(read_value_from_gribfile(filename, index))
+                    for gridindex in gridindices:
+                        value_list.append(read_value_from_gribfile(filename, gridindex))
 
-                except:                                                    # if not, check if file of older model is present
+                except:                                               # if not, check if file of older model is present
                     try:
                         oldermodel = True
 
                         filename = build_url(level, var, time_at_point)[1][:-4]
-                        value_list.append(read_value_from_gribfile(filename, index))
+                        for gridindex in gridindices:
+                            value_list.append(read_value_from_gribfile(filename, gridindex))
 
                     except:                                                # if both files are not yet present, download
                         oldermodel = False
 
                         download(level, var, time_at_point)
                         filename = build_url(level, var, time_at_point)[1][:-4]
-                        value_list.append(read_value_from_gribfile(filename, index))
+                        for gridindex in gridindices:
+                            value_list.append(read_value_from_gribfile(filename, gridindex))
 
-                if np.all(np.diff(alt_list) > 0):
-                    value = np.interp(alt, alt_list, value_list)            # lateral inerpolation of the 2 values
-                else:
-                    value = np.interp(alt, alt_list[::-1], value_list[::-1])   # x-axis must always be increasing for np.interp
+            # calculate actual distances from grid-distances and alts using pythagoras
+            act_distances = []
+            for altitude in alt_list:
+                for dist in griddistances:
+                    act_distances.append(math.sqrt((dist*1000)**2 + (altitude-alt)**2))
+
+            # interpolate value using "inverted distance weighting IDW"
+            nominator = 0
+            denominator = 0
+            for i in range(len(value_list)):
+                nominator += (value_list[i] / act_distances[i])
+                denominator += (1 / act_distances[i])
+            value = nominator / denominator
 
             print(f"{var} = ", value, ", interpolated from list: ", value_list)
 
