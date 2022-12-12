@@ -526,7 +526,7 @@ def read_from_txt(flightrows):
 def main_looper():
     starttime = datetime.utcnow()
 
-    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_5.txt", sep="\t", header=0)
+    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_2.txt", sep="\t", header=0)
 
     flightlist = []
     for flightnr in file["Flight Record"]:
