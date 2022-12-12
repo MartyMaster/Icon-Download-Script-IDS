@@ -24,12 +24,12 @@ def get_nearest(input_file, input_lat, input_lon):
     f = open(os.path.join(os.getcwd(), input_file), 'rb')
     gid = codes_grib_new_from_file(f)
 
-    nearest = codes_grib_find_nearest(gid, input_lat, input_lon)[0]
+    nearest = codes_grib_find_nearest(gid, input_lat, input_lon, npoints=4)
 
     codes_release(gid)
     f.close()
 
-    return nearest.index
+    return nearest
 
 
 def main(input_file, input_lat, input_lon):

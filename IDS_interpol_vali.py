@@ -9,7 +9,7 @@ from eccodes import *
 import fnmatch
 import csv
 import pandas as pd
-import numpy as np
+import math
 
 #################################
 #         Download HHL          #
@@ -63,8 +63,23 @@ def get_index_from_gribfile(file, lat, lon):
     """
     Calls eccodes_get_nearest.py which gives the index of the nearest point for any lat-lon-coordinate.
     """
-    index = eccodes_get_nearest.main(file, lat, lon)
-    return index
+    nearest = eccodes_get_nearest.main(file, lat, lon)
+
+    distances = []
+    indices = []
+    for pt in nearest:
+        distances.append(pt.distance)
+        indices.append(pt.index)
+
+    nearest = sorted(zip(distances, indices))
+
+    distances = []
+    indices = []
+    for pt in nearest:
+        distances.append(pt[0])
+        indices.append(pt[1])
+
+    return distances, indices
 
 
 #################################
@@ -263,6 +278,7 @@ def read_value_from_gribfile(file, index):
 
     return value[index]
 
+
 #################################
 #      Write to a csv-file      #
 #################################
@@ -276,7 +292,7 @@ def write_to_csv(data, flightnr):
     time = time.replace(":", "_")
     time = time.replace(" ","_")
 
-    filename = f"flight{flightnr}_IDSminus1h_interpol_lvl.csv"
+    filename = f"flight{flightnr}_IDSminus1h_IDW_interpol.csv"
 
     filedir = os.path.join(parentdir, "IDSdata")
     os.chdir(filedir)
@@ -292,6 +308,7 @@ def write_to_csv(data, flightnr):
 
     print(f"flight{flightnr} saved into csv")
     os.chdir(parentdir)
+
 
 #################################
 #      Remove old files         #
@@ -359,9 +376,18 @@ def main(flightrows, flightnr):
         else:
             ICON_switcher = "EU"
 
-        index = get_index_from_gribfile(f"{ICON_switcher}_HHL_level_1.grib2", lat, lon)
+        # lat,lon,alt,index,lvl describe the actual point. All lists starting with grid... describe the grid points
+        griddistances, gridindices = get_index_from_gribfile(f"{ICON_switcher}_HHL_level_1.grib2", lat, lon)
+        index = gridindices[0]
 
         lvl, level_list, alt_list = get_modellevel_from_altitude(index, alt)
+
+        gridalts = []
+        for gridlevel in level_list:
+            for gridindex in gridindices:                                   # calculate alt of full levels from HHLs
+                gridalt1 = read_value_from_gribfile(f"{ICON_switcher}_HHL_level_{gridlevel}.grib2", gridindex)
+                gridalt2 = read_value_from_gribfile(f"{ICON_switcher}_HHL_level_{gridlevel + 1}.grib2", gridindex)
+                gridalts.append((gridalt1 + gridalt2)/2)
 
         print("Point:", point, "// Model taken:", ICON_switcher, "// Level:", lvl)
 
@@ -388,10 +414,11 @@ def main(flightrows, flightnr):
                     except:
                         pass
                     filename = filename[:-4]
-                    value_list.append(read_value_from_gribfile(filename, index))
+                    for gridindex in gridindices:
+                        value_list.append(read_value_from_gribfile(filename, gridindex))
                     os.chdir(parentdir)
 
-                except:                                                    # if not, check if file of older model is present
+                except:                                                # if not, check if file of older model is present
                     try:
                         oldermodel = True
 
@@ -401,7 +428,8 @@ def main(flightrows, flightnr):
                         subdir = day + "_" + hour
                         filedir = os.path.join(parentdir, subdir)
                         os.chdir(filedir)
-                        value_list.append(read_value_from_gribfile(filename, index))
+                        for gridindex in gridindices:
+                            value_list.append(read_value_from_gribfile(filename, gridindex))
                         os.chdir(parentdir)
 
                     except:                                                # if both files are not yet present, download
@@ -420,15 +448,25 @@ def main(flightrows, flightnr):
 
                         os.chdir(filedir)
                         download(level, var, time_at_point)
-                        value_list.append(read_value_from_gribfile(filename, index))
+                        for gridindex in gridindices:
+                            value_list.append(read_value_from_gribfile(filename, gridindex))
                         os.chdir(parentdir)
 
-            if np.all(np.diff(alt_list) > 0):
-                value = np.interp(alt, alt_list, value_list)            # lateral inerpolation of the 2 values
-            else:
-                value = np.interp(alt, alt_list[::-1], value_list[::-1])   # x-axis must always be increasing for np.interp
+            # calculate actual distances from grid-distances and alts using pythagoras
+            act_distances = []
+            for altitude in alt_list:
+                for dist in griddistances:
+                    act_distances.append(math.sqrt((dist * 1000) ** 2 + (altitude - alt) ** 2))
 
-            # print(f"{var} = ", value, ", interpolated from list: ", value_list)
+            # interpolate value using "inverted distance weighting IDW"
+            nominator = 0
+            denominator = 0
+            for i in range(len(value_list)):
+                nominator += (value_list[i] / act_distances[i])
+                denominator += (1 / act_distances[i])
+            value = nominator / denominator
+
+            print(f"{var} = ", value, ", interpolated from list: ", value_list)
 
             csvrow.append(value)
 
@@ -488,7 +526,7 @@ def read_from_txt(flightrows):
 def main_looper():
     starttime = datetime.utcnow()
 
-    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_2.txt", sep="\t", header=0)
+    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_5.txt", sep="\t", header=0)
 
     flightlist = []
     for flightnr in file["Flight Record"]:
