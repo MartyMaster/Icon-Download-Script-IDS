@@ -25,34 +25,48 @@ def download_HHL():
         if fnmatch.fnmatch(file, '*HHL_level*'):
             HHL_counter += 1
 
-    if HHL_counter > 126:
-        return
+    if HHL_counter <= 126:
 
-    global oldermodel                  # HHL is time-invariant, so it's not necessary to check whether the latest model
-    oldermodel = True                  # is available. It's easier to just download an older file.
+        global oldermodel               # HHL is time-invariant, so it's not necessary to check whether the latest model
+        oldermodel = True               # is available. It's easier to just download an older file.
 
-    rounded_time = round_down_time(0)
+        rounded_time = round_down_time(0)
 
-    date = rounded_time[0][0:8]
-    hour = rounded_time[0][9:11]
+        date = rounded_time[0][0:8]
+        hour = rounded_time[0][9:11]
+
+        for i in range(1, 67):
+            url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/hhl/icon-d2_germany_regular-lat-lon" \
+                  f"_time-invariant_{date}{hour}_000_{i}_hhl.grib2.bz2"
+            urllib.request.urlretrieve(url, f"D2_HHL_level_{i}.grib2.bz2")
+            unzip_file(f"D2_HHL_level_{i}.grib2.bz2")
+            i += 1
+
+        for i in range(1, 62):
+            url = f"https://opendata.dwd.de/weather/nwp/icon-eu/grib/{hour}/hhl/icon-eu_europe_regular-lat-lon_" \
+                  f"time-invariant_{date}{hour}_{i}_HHL.grib2.bz2"
+            urllib.request.urlretrieve(url, f"EU_HHL_level_{i}.grib2.bz2")
+            unzip_file(f"EU_HHL_level_{i}.grib2.bz2")
+            i += 1
+
+    D2_HHls = []
+    EU_HHLs = []
 
     for i in range(1, 67):
-        url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/hhl/icon-d2_germany_regular-lat-lon" \
-              f"_time-invariant_{date}{hour}_000_{i}_hhl.grib2.bz2"
-
-        urllib.request.urlretrieve(url, f"D2_HHL_level_{i}.grib2.bz2")
-
-        unzip_file(f"D2_HHL_level_{i}.grib2.bz2")
-        i += 1
+        f = open(os.path.join(os.getcwd(), f"D2_HHL_level_{i}.grib2"), 'rb')
+        gid = codes_grib_new_from_file(f)
+        D2_HHls.append(codes_get_values(gid))
+        codes_release(gid)
+        f.close()
 
     for i in range(1, 62):
-        url = f"https://opendata.dwd.de/weather/nwp/icon-eu/grib/{hour}/hhl/icon-eu_europe_regular-lat-lon_" \
-              f"time-invariant_{date}{hour}_{i}_HHL.grib2.bz2"
+        f = open(os.path.join(os.getcwd(), f"EU_HHL_level_{i}.grib2"), 'rb')
+        gid = codes_grib_new_from_file(f)
+        EU_HHLs.append(codes_get_values(gid))
+        codes_release(gid)
+        f.close()
 
-        urllib.request.urlretrieve(url, f"EU_HHL_level_{i}.grib2.bz2")
-
-        unzip_file(f"EU_HHL_level_{i}.grib2.bz2")
-        i += 1
+    return D2_HHls, EU_HHLs
 
 
 #################################
@@ -86,7 +100,7 @@ def get_index_from_gribfile(file, lat, lon):
 #        Get Modellevel         #
 #################################
 
-def get_modellevel_from_altitude(index, alt):
+def get_modellevel_from_altitude(inputHHLs, index, alt):
     """
     Returns the fulllevel which is closest to the given altitude at given index. This function works with a try/except
     block, because the ICON-D2 and the ICON-EU models do not have the same amount of levels.
@@ -102,8 +116,11 @@ def get_modellevel_from_altitude(index, alt):
     i = 1
     while True:                                     # Get values for all halflevels
         try:
-            HHL = read_value_from_gribfile(f"{ICON_switcher}_HHL_level_{i}.grib2", index)
-            HHLs.append(HHL)
+            if performer == "A":
+                HHL = read_value_from_gribfile(f"{ICON_switcher}_HHL_level_{i}.grib2", index)
+                HHLs.append(HHL)
+            else:
+                HHLs.append(inputHHLs[i-1][index])
         except:
             break
         finally:
@@ -336,7 +353,7 @@ def remove_old_files():
 
 def main(flightrows, flightnr):
 
-    download_HHL()
+    D2_HHLs, EU_HHLs = download_HHL()
 
     variables_of_interest = ["t", "p", "qv", "u", "v", "w"]
 
@@ -380,7 +397,10 @@ def main(flightrows, flightnr):
         griddistances, gridindices = get_index_from_gribfile(f"{ICON_switcher}_HHL_level_1.grib2", lat, lon)
         index = gridindices[0]
 
-        lvl, level_list, alt_list = get_modellevel_from_altitude(index, alt)
+        if ICON_switcher == "D2":
+            lvl, level_list, alt_list = get_modellevel_from_altitude(D2_HHLs, index, alt)
+        else:
+            lvl, level_list, alt_list = get_modellevel_from_altitude(EU_HHLs, index, alt)
 
         gridalts = []
         for gridlevel in level_list:
@@ -526,18 +546,41 @@ def read_from_txt(flightrows):
 def main_looper():
     starttime = datetime.utcnow()
 
-    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_4.txt", sep="\t", header=0)
+    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_3.txt", sep="\t", header=0)
 
     flightlist = []
     for flightnr in file["Flight Record"]:
         if flightnr not in flightlist:
             flightlist.append(flightnr)
 
-    for flightnr in flightlist:
-        flightrows = file.loc[file["Flight Record"] == flightnr]
-        main(flightrows, flightnr)
+    i = 0
+    A_flights = []
+    B_flights = []
+    global performer
+    performer = "A"
 
-    print(f"IDS finished at {datetime.utcnow()}, start time was {starttime}")
+    for flightnr in flightlist:
+        if i % 2 == 0:
+            A_starttime = datetime.utcnow()
+            performer = "A"
+            flightrows = file.loc[file["Flight Record"] == flightnr]
+            main(flightrows, flightnr)
+            A_endtime = datetime.utcnow()
+            A_flights.append(A_endtime - A_starttime)
+
+        else:
+            B_starttime = datetime.utcnow()
+            performer = "B"
+            flightrows = file.loc[file["Flight Record"] == flightnr]
+            main(flightrows, flightnr)
+            B_endtime = datetime.utcnow()
+            B_flights.append(B_endtime - B_starttime)
+        i += 1
+
+    A_avgtime = sum(A_flights, timedelta(0)) / len(A_flights)
+    B_avgtime = sum(B_flights, timedelta(0)) / len(B_flights)
+    print(f"IDS finished at {datetime.utcnow()}, start time was {starttime}\n"
+          f"Avg time of flights with old HHL method was {A_avgtime}, avg of flights with new HHL method was {B_avgtime}")
 
 
 if __name__ == '__main__':
