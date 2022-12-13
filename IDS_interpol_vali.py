@@ -389,7 +389,7 @@ def main(flightrows, flightnr):
                 gridalt2 = read_value_from_gribfile(f"{ICON_switcher}_HHL_level_{gridlevel + 1}.grib2", gridindex)
                 gridalts.append((gridalt1 + gridalt2)/2)
 
-        print("Point:", point, "// Model taken:", ICON_switcher, "// Level:", lvl)
+        # print("Point:", point, "// Model taken:", ICON_switcher, "// Level:", lvl)
 
         csvrow = [lat, lon, alt, time_at_point, exactGMT, lvl]
 
@@ -526,7 +526,7 @@ def read_from_txt(flightrows):
 def main_looper():
     starttime = datetime.utcnow()
 
-    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_2.txt", sep="\t", header=0)
+    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_4.txt", sep="\t", header=0)
 
     flightlist = []
     for flightnr in file["Flight Record"]:
