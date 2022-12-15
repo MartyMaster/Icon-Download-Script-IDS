@@ -113,10 +113,10 @@ def get_modellevel_from_altitude(inputHHLs, index, alt):
     HHLs = []                                       # List of altitudes of all halflevels
     HFLs = []                                       # List of altitudes of all fulllevels
 
-    i = 1
+    i = 0
     while True:                                     # Get values for all halflevels
         try:
-            HHLs.append(inputHHLs[i - 1][index])
+            HHLs.append(inputHHLs[i][index])
         except:
             break
         finally:
