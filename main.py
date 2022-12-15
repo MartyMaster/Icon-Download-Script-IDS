@@ -24,34 +24,48 @@ def download_HHL():
         if fnmatch.fnmatch(file, '*HHL_level*'):
             HHL_counter += 1
 
-    if HHL_counter > 126:
-        return
+    if HHL_counter <= 126:
 
-    global oldermodel                  # HHL is time-invariant, so it's not necessary to check whether the latest model
-    oldermodel = True                  # is available. It's easier to just download an older file.
+        global oldermodel                  # HHL is time-invariant, so it's not necessary to check whether the latest model
+        oldermodel = True                  # is available. It's easier to just download an older file.
 
-    rounded_time = round_down_time(0)
+        rounded_time = round_down_time(0)
 
-    date = rounded_time[0][0:8]
-    hour = rounded_time[0][9:11]
+        date = rounded_time[0][0:8]
+        hour = rounded_time[0][9:11]
+
+        for i in range(1, 67):
+            url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/hhl/icon-d2_germany_regular-lat-lon" \
+                  f"_time-invariant_{date}{hour}_000_{i}_hhl.grib2.bz2"
+            urllib.request.urlretrieve(url, f"D2_HHL_level_{i}.grib2.bz2")
+            unzip_file(f"D2_HHL_level_{i}.grib2.bz2")
+            i += 1
+
+        for i in range(1, 62):
+            url = f"https://opendata.dwd.de/weather/nwp/icon-eu/grib/{hour}/hhl/icon-eu_europe_regular-lat-lon_" \
+                  f"time-invariant_{date}{hour}_{i}_HHL.grib2.bz2"
+            urllib.request.urlretrieve(url, f"EU_HHL_level_{i}.grib2.bz2")
+            unzip_file(f"EU_HHL_level_{i}.grib2.bz2")
+            i += 1
+
+    D2_HHls = []
+    EU_HHLs = []
 
     for i in range(1, 67):
-        url = f"https://opendata.dwd.de/weather/nwp/icon-d2/grib/{hour}/hhl/icon-d2_germany_regular-lat-lon" \
-              f"_time-invariant_{date}{hour}_000_{i}_hhl.grib2.bz2"
-
-        urllib.request.urlretrieve(url, f"D2_HHL_level_{i}.grib2.bz2")
-
-        unzip_file(f"D2_HHL_level_{i}.grib2.bz2")
-        i += 1
+        f = open(os.path.join(os.getcwd(), f"D2_HHL_level_{i}.grib2"), 'rb')
+        gid = codes_grib_new_from_file(f)
+        D2_HHls.append(codes_get_values(gid))
+        codes_release(gid)
+        f.close()
 
     for i in range(1, 62):
-        url = f"https://opendata.dwd.de/weather/nwp/icon-eu/grib/{hour}/hhl/icon-eu_europe_regular-lat-lon_" \
-              f"time-invariant_{date}{hour}_{i}_HHL.grib2.bz2"
+        f = open(os.path.join(os.getcwd(), f"EU_HHL_level_{i}.grib2"), 'rb')
+        gid = codes_grib_new_from_file(f)
+        EU_HHLs.append(codes_get_values(gid))
+        codes_release(gid)
+        f.close()
 
-        urllib.request.urlretrieve(url, f"EU_HHL_level_{i}.grib2.bz2")
-
-        unzip_file(f"EU_HHL_level_{i}.grib2.bz2")
-        i += 1
+    return D2_HHls, EU_HHLs
 
 
 #################################
@@ -70,7 +84,7 @@ def get_index_from_gribfile(file, lat, lon):
 #        Get Modellevel         #
 #################################
 
-def get_modellevel_from_altitude(index, alt):
+def get_modellevel_from_altitude(inputHHLs, index, alt):
     """
     Returns the fulllevel which is closest to the given altitude at given index. This function works with a try/except
     block, because the ICON-D2 and the ICON-EU models do not have the same amount of levels.
@@ -83,11 +97,10 @@ def get_modellevel_from_altitude(index, alt):
     HHLs = []                                       # List of altitudes of all halflevels
     HFLs = []                                       # List of altitudes of all fulllevels
 
-    i = 1
+    i = 0
     while True:                                     # Get values for all halflevels
         try:
-            HHL = read_value_from_gribfile(f"{ICON_switcher}_HHL_level_{i}.grib2", index)
-            HHLs.append(HHL)
+            HHLs.append(inputHHLs[i][index])
         except:
             break
         finally:
@@ -281,7 +294,7 @@ def remove_old_files():
 
 def main():
 
-    download_HHL()
+    D2_HHLs, EU_HHLs = download_HHL()
 
     variables_of_interest = ["t", "p", "qv", "u", "v", "w"]
 
@@ -320,7 +333,10 @@ def main():
 
         index = get_index_from_gribfile(f"{ICON_switcher}_HHL_level_1.grib2", lat, lon)
 
-        lvl = get_modellevel_from_altitude(index, alt)
+        if ICON_switcher == "D2":
+            lvl = get_modellevel_from_altitude(D2_HHLs, index, alt)
+        else:
+            lvl = get_modellevel_from_altitude(EU_HHLs, index, alt)
 
         print("Point:", point, "// Model taken:", ICON_switcher, "// Level:", lvl)
 
