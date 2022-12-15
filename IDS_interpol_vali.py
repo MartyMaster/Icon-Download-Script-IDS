@@ -113,14 +113,10 @@ def get_modellevel_from_altitude(inputHHLs, index, alt):
     HHLs = []                                       # List of altitudes of all halflevels
     HFLs = []                                       # List of altitudes of all fulllevels
 
-    i = 1
+    i = 0
     while True:                                     # Get values for all halflevels
         try:
-            if performer == "A":
-                HHL = read_value_from_gribfile(f"{ICON_switcher}_HHL_level_{i}.grib2", index)
-                HHLs.append(HHL)
-            else:
-                HHLs.append(inputHHLs[i-1][index])
+            HHLs.append(inputHHLs[i][index])
         except:
             break
         finally:
@@ -546,41 +542,18 @@ def read_from_txt(flightrows):
 def main_looper():
     starttime = datetime.utcnow()
 
-    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_3.txt", sep="\t", header=0)
+    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_5.txt", sep="\t", header=0)
 
     flightlist = []
     for flightnr in file["Flight Record"]:
         if flightnr not in flightlist:
             flightlist.append(flightnr)
 
-    i = 0
-    A_flights = []
-    B_flights = []
-    global performer
-    performer = "A"
-
     for flightnr in flightlist:
-        if i % 2 == 0:
-            A_starttime = datetime.utcnow()
-            performer = "A"
-            flightrows = file.loc[file["Flight Record"] == flightnr]
-            main(flightrows, flightnr)
-            A_endtime = datetime.utcnow()
-            A_flights.append(A_endtime - A_starttime)
+        flightrows = file.loc[file["Flight Record"] == flightnr]
+        main(flightrows, flightnr)
 
-        else:
-            B_starttime = datetime.utcnow()
-            performer = "B"
-            flightrows = file.loc[file["Flight Record"] == flightnr]
-            main(flightrows, flightnr)
-            B_endtime = datetime.utcnow()
-            B_flights.append(B_endtime - B_starttime)
-        i += 1
-
-    A_avgtime = sum(A_flights, timedelta(0)) / len(A_flights)
-    B_avgtime = sum(B_flights, timedelta(0)) / len(B_flights)
-    print(f"IDS finished at {datetime.utcnow()}, start time was {starttime}\n"
-          f"Avg time of flights with old HHL method was {A_avgtime}, avg of flights with new HHL method was {B_avgtime}")
+    print(f"IDS finished at {datetime.utcnow()}, start time was {starttime}")
 
 
 if __name__ == '__main__':
