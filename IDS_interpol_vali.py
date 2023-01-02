@@ -397,14 +397,14 @@ def main(flightrows, flightnr):
             lvl, level_list, alt_list = get_modellevel_from_altitude(D2_HHLs, index, alt)
         else:
             lvl, level_list, alt_list = get_modellevel_from_altitude(EU_HHLs, index, alt)
-
+        """
         gridalts = []
         for gridlevel in level_list:
             for gridindex in gridindices:                                   # calculate alt of full levels from HHLs
                 gridalt1 = read_value_from_gribfile(f"{ICON_switcher}_HHL_level_{gridlevel}.grib2", gridindex)
                 gridalt2 = read_value_from_gribfile(f"{ICON_switcher}_HHL_level_{gridlevel + 1}.grib2", gridindex)
                 gridalts.append((gridalt1 + gridalt2)/2)
-
+        """
         # print("Point:", point, "// Model taken:", ICON_switcher, "// Level:", lvl)
 
         csvrow = [lat, lon, alt, time_at_point, exactGMT, lvl]
@@ -467,12 +467,13 @@ def main(flightrows, flightnr):
                         for gridindex in gridindices:
                             value_list.append(read_value_from_gribfile(filename, gridindex))
                         os.chdir(parentdir)
-
+            """
             # calculate actual distances from grid-distances and alts using pythagoras
             act_distances = []
-            for altitude in alt_list:
-                for dist in griddistances:
-                    act_distances.append(math.sqrt((dist * 1000) ** 2 + (altitude - alt) ** 2))
+            for i in range(len(griddistances)):
+                act_distances.append(math.sqrt((griddistances[i] * 1000) ** 2 + (gridalts[i] - alt) ** 2))
+            for i in range(len(griddistances)):
+                act_distances.append(math.sqrt((griddistances[i] * 1000) ** 2 + (gridalts[i+4] - alt) ** 2))
 
             # interpolate value using "inverted distance weighting IDW"
             nominator = 0
@@ -481,6 +482,25 @@ def main(flightrows, flightnr):
                 nominator += (value_list[i] / act_distances[i])
                 denominator += (1 / act_distances[i])
             value = nominator / denominator
+            """
+
+            # Interpolating values using "inverted distance weighting IDW" on both levels first
+            nominator = 0
+            denominator = 0
+            for i in range(len(griddistances)):
+                nominator += (value_list[i] / griddistances[i])
+                denominator += (1 / griddistances[i])
+            value_alt1 = nominator / denominator
+
+            nominator = 0
+            denominator = 0
+            for i in range(len(griddistances)):
+                nominator += (value_list[i+4] / griddistances[i])
+                denominator += (1 / griddistances[i])
+            value_alt2 = nominator / denominator
+
+            # Another IDW between the levels
+            value = ((value_alt1/abs(alt_list[0]-alt) + value_alt2/abs(alt_list[1]-alt)) / (1/abs(alt_list[0]-alt) + 1/abs(alt_list[1]-alt)))
 
             # print(f"{var} = ", value, ", interpolated from list: ", value_list)
 
