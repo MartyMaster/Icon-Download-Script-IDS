@@ -305,7 +305,7 @@ def write_to_csv(data, flightnr):
     time = time.replace(":", "_")
     time = time.replace(" ","_")
 
-    filename = f"flight{flightnr}_IDSminus1h_IDW_interpol.csv"
+    filename = f"flight{flightnr}_IDSminus1h_IDW_horizontal_interpol.csv"
 
     filedir = os.path.join(parentdir, "IDSdata")
     os.chdir(filedir)
@@ -397,6 +397,10 @@ def main(flightrows, flightnr):
             lvl, level_list, alt_list = get_modellevel_from_altitude(D2_HHLs, index, alt)
         else:
             lvl, level_list, alt_list = get_modellevel_from_altitude(EU_HHLs, index, alt)
+
+        # WARNING: this next line is only for horizontal interpolation and will delete any vertical interpolation
+        level_list.pop(1)
+
         """
         gridalts = []
         for gridlevel in level_list:
@@ -490,8 +494,8 @@ def main(flightrows, flightnr):
             for i in range(len(griddistances)):
                 nominator += (value_list[i] / griddistances[i])
                 denominator += (1 / griddistances[i])
-            value_alt1 = nominator / denominator
-
+            value = nominator / denominator
+            """
             nominator = 0
             denominator = 0
             for i in range(len(griddistances)):
@@ -501,7 +505,7 @@ def main(flightrows, flightnr):
 
             # Another IDW between the levels
             value = ((value_alt1/abs(alt_list[0]-alt) + value_alt2/abs(alt_list[1]-alt)) / (1/abs(alt_list[0]-alt) + 1/abs(alt_list[1]-alt)))
-
+            """
             # print(f"{var} = ", value, ", interpolated from list: ", value_list)
 
             csvrow.append(value)
@@ -562,7 +566,7 @@ def read_from_txt(flightrows):
 def main_looper():
     starttime = datetime.utcnow()
 
-    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_2.txt", sep="\t", header=0)
+    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_5.txt", sep="\t", header=0)
 
     flightlist = []
     for flightnr in file["Flight Record"]:
