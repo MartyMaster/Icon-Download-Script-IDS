@@ -272,7 +272,7 @@ def write_to_csv(data, flightnr):
     time = time.replace(":", "_")
     time = time.replace(" ","_")
 
-    filename = f"flight{flightnr}_IDSminus4h.csv"
+    filename = f"flight{flightnr}_IDSminus1h.csv"
 
     filedir = os.path.join(parentdir, "IDSdata")
     os.chdir(filedir)
@@ -355,6 +355,9 @@ def main(flightrows, flightnr):
                 ICON_switcher = "EU"
         else:
             ICON_switcher = "EU"
+
+        # Forcing switcher to EU for validation, set back later again #######################################################
+        # ICON_switcher = "EU"
 
         index = get_index_from_gribfile(f"{ICON_switcher}_HHL_level_1.grib2", lat, lon)
 
@@ -477,6 +480,7 @@ def read_from_txt(flightrows):
 
 
 def main_looper():
+    starttime = datetime.utcnow()
     file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_5.txt", sep="\t", header=0)
 
     flightlist = []
@@ -488,7 +492,7 @@ def main_looper():
         flightrows = file.loc[file["Flight Record"] == flightnr]
         main(flightrows, flightnr)
 
-    print(f"IDS finished at {datetime.utcnow()}")
+    print(f"IDS finished at {datetime.utcnow()}, started at {starttime}")
 
 
 if __name__ == '__main__':
