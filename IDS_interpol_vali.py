@@ -237,15 +237,11 @@ def round_down_time(time_at_point):
 
     rounded_time = actual_time.replace(microsecond=0, second=0, minute=0) - timedelta(hours=rounder)
 
-    if type(time_at_point) is datetime:               # if a time is given, take forecast from nearest hour to that time
-        difference = time_at_point - rounded_time
-        difference = difference.total_seconds()//60
-        rounder = str(round(difference / 60))
-        if int(rounder) > 24 or int(rounder) < 0:
-            sys.exit("Time given is out of window")
-
-    elif actual_time.minute > 30:                       # if no time is given, just take forecast from nearest full hour
-        rounder += 1
+    difference = time_at_point - rounded_time
+    difference = difference.total_seconds()//60 + 0.1
+    rounder = str(round(difference / 60))
+    if int(rounder) > 24 or int(rounder) < 0:
+        sys.exit("Time given is out of window")
 
     rounded_time = str(rounded_time)
     rounded_time = rounded_time.replace("-", "")
@@ -312,7 +308,7 @@ def write_to_csv(data, flightnr):
     time = time.replace(":", "_")
     time = time.replace(" ","_")
 
-    filename = f"flight{flightnr}_IDSminus1h_IDW_horizontal_interpol.csv"
+    filename = f"flight{flightnr}_IDSminus1h_IDW_horizontal_and_time_interpol.csv"
 
     filedir = os.path.join(parentdir, "IDSdata")
     os.chdir(filedir)
@@ -413,8 +409,14 @@ def main(flightrows, flightnr):
             time_at_point = datetime(point[3], point[4], point[5], point[6], point[7])
             # print(time_at_point)
         else:
-            time_at_point = 0
+            time_at_point = datetime.utcnow()
             # print("Current time taken")
+
+        if time_at_point.minute >= 30:
+            time_at_point2 = time_at_point - timedelta(minutes=30)
+        else:
+            time_at_point2 = time_at_point + timedelta(minutes=30)
+        time_at_point_list = [time_at_point, time_at_point2]
 
         # Check if coordinates are within ICON-D2 range. Otherwise use ICON-EU
         if 44 <= lat <= 50:
@@ -458,96 +460,114 @@ def main(flightrows, flightnr):
 
             os.chdir(parentdir)
 
-            value_list = []
+            value_time_list = []
 
-            for level in level_list:
+            for time_at in time_at_point_list:
 
-                global oldermodel                       # used if latest model is not yet available
-                oldermodel = False
+                value_list = []
 
-                try:                                                       # check if file is already present
-                    filename, day, hour = build_url(level, var, time_at_point)[1:4]
-                    subdir = day + "_" + hour
-                    filedir = os.path.join(parentdir, subdir)
-                    os.chdir(filedir)
-                    try:
-                        unzip_file(filename)
-                    except:
-                        pass
-                    filename = filename[:-4]
-                    for gridindex in gridindices:
-                        value_list.append(read_value_from_gribfile(filename, gridindex))
-                    os.chdir(parentdir)
+                for level in level_list:
 
-                except:                                                # if not, check if file of older model is present
-                    try:
-                        oldermodel = True
+                    global oldermodel                       # used if latest model is not yet available
+                    oldermodel = False
 
-                        os.chdir(parentdir)
-                        filename, day, hour = build_url(level, var, time_at_point)[1:4]
-                        filename = filename[:-4]
+                    try:                                                       # check if file is already present
+                        filename, day, hour = build_url(level, var, time_at)[1:4]
                         subdir = day + "_" + hour
                         filedir = os.path.join(parentdir, subdir)
                         os.chdir(filedir)
-                        for gridindex in gridindices:
-                            value_list.append(read_value_from_gribfile(filename, gridindex))
-                        os.chdir(parentdir)
-
-                    except:                                                # if both files are not yet present, download
-                        oldermodel = False
-
-                        os.chdir(parentdir)
-                        filename, day, hour = build_url(level, var, time_at_point)[1:4]
-                        filename = filename[:-4]
-                        subdir = day + "_" + hour
-                        filedir = os.path.join(parentdir, subdir)
-
                         try:
-                            os.mkdir(filedir, mode=0o777)
+                            unzip_file(filename)
                         except:
                             pass
-
-                        os.chdir(filedir)
-                        download(level, var, time_at_point)
+                        filename = filename[:-4]
                         for gridindex in gridindices:
                             value_list.append(read_value_from_gribfile(filename, gridindex))
                         os.chdir(parentdir)
-            """
-            # calculate actual distances from grid-distances and alts using pythagoras
-            act_distances = []
-            for i in range(len(griddistances)):
-                act_distances.append(math.sqrt((griddistances[i] * 1000) ** 2 + (gridalts[i] - alt) ** 2))
-            for i in range(len(griddistances)):
-                act_distances.append(math.sqrt((griddistances[i] * 1000) ** 2 + (gridalts[i+4] - alt) ** 2))
 
-            # interpolate value using "inverted distance weighting IDW"
+                    except:                                                # if not, check if file of older model is present
+                        try:
+                            oldermodel = True
+
+                            os.chdir(parentdir)
+                            filename, day, hour = build_url(level, var, time_at)[1:4]
+                            filename = filename[:-4]
+                            subdir = day + "_" + hour
+                            filedir = os.path.join(parentdir, subdir)
+                            os.chdir(filedir)
+                            for gridindex in gridindices:
+                                value_list.append(read_value_from_gribfile(filename, gridindex))
+                            os.chdir(parentdir)
+
+                        except:                                                # if both files are not yet present, download
+                            oldermodel = False
+
+                            os.chdir(parentdir)
+                            filename, day, hour = build_url(level, var, time_at)[1:4]
+                            filename = filename[:-4]
+                            subdir = day + "_" + hour
+                            filedir = os.path.join(parentdir, subdir)
+
+                            try:
+                                os.mkdir(filedir, mode=0o777)
+                            except:
+                                pass
+
+                            os.chdir(filedir)
+                            download(level, var, time_at)
+                            for gridindex in gridindices:
+                                value_list.append(read_value_from_gribfile(filename, gridindex))
+                            os.chdir(parentdir)
+                """
+                # calculate actual distances from grid-distances and alts using pythagoras
+                act_distances = []
+                for i in range(len(griddistances)):
+                    act_distances.append(math.sqrt((griddistances[i] * 1000) ** 2 + (gridalts[i] - alt) ** 2))
+                for i in range(len(griddistances)):
+                    act_distances.append(math.sqrt((griddistances[i] * 1000) ** 2 + (gridalts[i+4] - alt) ** 2))
+    
+                # interpolate value using "inverted distance weighting IDW"
+                nominator = 0
+                denominator = 0
+                for i in range(len(value_list)):
+                    nominator += (value_list[i] / act_distances[i])
+                    denominator += (1 / act_distances[i])
+                value = nominator / denominator
+                """
+
+                # Interpolating values using "inverted distance weighting IDW" on both levels first
+                nominator = 0
+                denominator = 0
+                for i in range(len(griddistances)):
+                    nominator += (value_list[i] / griddistances[i])
+                    denominator += (1 / griddistances[i])
+                value = nominator / denominator
+
+                """
+                nominator = 0
+                denominator = 0
+                for i in range(len(griddistances)):
+                    nominator += (value_list[i+4] / griddistances[i])
+                    denominator += (1 / griddistances[i])
+                value_alt2 = nominator / denominator
+    
+                # Another IDW between the levels
+                value = ((value_alt1/abs(alt_list[0]-alt) + value_alt2/abs(alt_list[1]-alt)) / (1/abs(alt_list[0]-alt) + 1/abs(alt_list[1]-alt)))
+                """
+
+                # for Time interpolation
+                value_time_list.append(value)
+
+            # Time interolation: weighting is 1/(minutes away from full hour)
             nominator = 0
             denominator = 0
-            for i in range(len(value_list)):
-                nominator += (value_list[i] / act_distances[i])
-                denominator += (1 / act_distances[i])
+            nominator += (value_time_list[0] / ((60 - time_at_point.minute) / 60))
+            nominator += (value_time_list[1] / (time_at_point.minute / 60))
+            denominator += (1 / (time_at_point.minute / 60))
+            denominator += (1 / ((60 - time_at_point.minute) / 60))
             value = nominator / denominator
-            """
 
-            # Interpolating values using "inverted distance weighting IDW" on both levels first
-            nominator = 0
-            denominator = 0
-            for i in range(len(griddistances)):
-                nominator += (value_list[i] / griddistances[i])
-                denominator += (1 / griddistances[i])
-            value = nominator / denominator
-            """
-            nominator = 0
-            denominator = 0
-            for i in range(len(griddistances)):
-                nominator += (value_list[i+4] / griddistances[i])
-                denominator += (1 / griddistances[i])
-            value_alt2 = nominator / denominator
-
-            # Another IDW between the levels
-            value = ((value_alt1/abs(alt_list[0]-alt) + value_alt2/abs(alt_list[1]-alt)) / (1/abs(alt_list[0]-alt) + 1/abs(alt_list[1]-alt)))
-            """
-            # print(f"{var} = ", value, ", interpolated from list: ", value_list)
+            #print(f"{var} = ", value, ", interpolated from list: ", value_list, "and then timelist: ", value_time_list)
 
             csvrow.append(value)
 
@@ -615,16 +635,19 @@ def read_from_txt(flightrows):
 def main_looper():
     starttime = datetime.utcnow()
 
-    file = pd.read_csv("20221116_data_export_Martin_Jansen_ZHAW_5.txt", sep="\t", header=0)
+    for i in range(4):
+        file = pd.read_csv(f"20221116_data_export_Martin_Jansen_ZHAW_{i+2}.txt", sep="\t", header=0)
+        print("File", i+2)
+        # file = pd.read_csv(f"20221116_data_export_Martin_Jansen_ZHAW_5.txt", sep="\t", header=0)
 
-    flightlist = []
-    for flightnr in file["Flight Record"]:
-        if flightnr not in flightlist:
-            flightlist.append(flightnr)
+        flightlist = []
+        for flightnr in file["Flight Record"]:
+            if flightnr not in flightlist:
+                flightlist.append(flightnr)
 
-    for flightnr in flightlist:
-        flightrows = file.loc[file["Flight Record"] == flightnr]
-        main(flightrows, flightnr)
+        for flightnr in flightlist:
+            flightrows = file.loc[file["Flight Record"] == flightnr]
+            main(flightrows, flightnr)
 
     print(f"IDS finished at {datetime.utcnow()}, start time was {starttime}")
 
