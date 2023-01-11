@@ -562,7 +562,7 @@ def main(flightrows, flightnr):
             nominator = 0
             denominator = 0
             nominator += (value_time_list[0] / ((60 - time_at_point.minute) / 60))
-            nominator += (value_time_list[1] / (time_at_point.minute / 60))
+            nominator += (value_time_list[1] / ((time_at_point.minute + 0.001) / 60))   # +0.001 to avoid division by zero
             denominator += (1 / (time_at_point.minute / 60))
             denominator += (1 / ((60 - time_at_point.minute) / 60))
             value = nominator / denominator
