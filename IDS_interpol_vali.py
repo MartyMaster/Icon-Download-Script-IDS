@@ -308,7 +308,7 @@ def write_to_csv(data, flightnr):
     time = time.replace(":", "_")
     time = time.replace(" ","_")
 
-    filename = f"flight{flightnr}_IDSminus1h_IDW_horizontal_and_time_interpol.csv"
+    filename = f"flight{flightnr}_IDSminus1h_interpol_lvl_and_time.csv"
 
     filedir = os.path.join(parentdir, "IDSdata")
     os.chdir(filedir)
@@ -438,7 +438,11 @@ def main(flightrows, flightnr):
             lvl, level_list, alt_list = get_modellevel_from_altitude(EU_HHLs, index, alt)
 
         # WARNING: this next line is only for horizontal interpolation and will delete any vertical interpolation
-        level_list.pop(1)
+        # level_list.pop(1)
+        # WARNING: this next lines are only for vertical interpolation and will delete any horizontal interpolation
+        gridindices.pop(1)
+        gridindices.pop(1)
+        gridindices.pop(1)
 
         """
         gridalts = []
@@ -518,6 +522,7 @@ def main(flightrows, flightnr):
                             for gridindex in gridindices:
                                 value_list.append(read_value_from_gribfile(filename, gridindex))
                             os.chdir(parentdir)
+
                 """
                 # calculate actual distances from grid-distances and alts using pythagoras
                 act_distances = []
@@ -532,8 +537,7 @@ def main(flightrows, flightnr):
                 for i in range(len(value_list)):
                     nominator += (value_list[i] / act_distances[i])
                     denominator += (1 / act_distances[i])
-                value = nominator / denominator
-                """
+                value = nominator / denominator                
 
                 # Interpolating values using "inverted distance weighting IDW" on both levels first
                 nominator = 0
@@ -543,17 +547,19 @@ def main(flightrows, flightnr):
                     denominator += (1 / griddistances[i])
                 value = nominator / denominator
 
-                """
                 nominator = 0
                 denominator = 0
                 for i in range(len(griddistances)):
                     nominator += (value_list[i+4] / griddistances[i])
                     denominator += (1 / griddistances[i])
                 value_alt2 = nominator / denominator
-    
+                """
+                value_alt1 = value_list[0]
+                value_alt2 = value_list[1]
+
                 # Another IDW between the levels
                 value = ((value_alt1/abs(alt_list[0]-alt) + value_alt2/abs(alt_list[1]-alt)) / (1/abs(alt_list[0]-alt) + 1/abs(alt_list[1]-alt)))
-                """
+
 
                 # for Time interpolation
                 value_time_list.append(value)
@@ -563,7 +569,7 @@ def main(flightrows, flightnr):
             denominator = 0
             nominator += (value_time_list[0] / ((60 - time_at_point.minute) / 60))
             nominator += (value_time_list[1] / ((time_at_point.minute + 0.001) / 60))   # +0.001 to avoid division by zero
-            denominator += (1 / ((time_at_point.minute +0.001) / 60))
+            denominator += (1 / ((time_at_point.minute + 0.001) / 60))
             denominator += (1 / ((60 - time_at_point.minute) / 60))
             value = nominator / denominator
 
