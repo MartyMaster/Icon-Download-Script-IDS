@@ -81,26 +81,21 @@ def get_index_from_gribfile(file, lat, lon):
 
     distances = []
     indices = []
-    lats = []
-    lons = []
+
     for pt in nearest:
         distances.append(pt.distance)
         indices.append(pt.index)
-        lats.append(pt.lat)
-        lons.append(pt.lon)
 
-    nearest = sorted(zip(distances, indices, lats, lons))
+    nearest = sorted(zip(distances, indices))
 
     distances = []
     indices = []
-    coords = []
+
     for pt in nearest:
         distances.append(pt[0])
         indices.append(pt[1])
-        coords.append(pt[2])
-        coords.append(pt[3])
 
-    return distances, indices, coords
+    return distances, indices
 
 
 #################################
@@ -301,6 +296,8 @@ def read_value_from_gribfile(file, index):
 
 def write_to_csv(data, flightnr):
     header = ["Latitude", "Longitude", "geometric Altitude (m)", "UTC", "exactGMT", "Level", "t", "p", "qv", "u", "v", "w"]
+    # This next line is only for speeding up validation, where qv is not needed
+    header = ["Latitude", "Longitude", "geometric Altitude (m)", "UTC", "exactGMT", "Level", "t", "p", "u", "v", "w"]
 
     time = datetime.utcnow()
     time = str(time.replace(microsecond=0))
@@ -308,7 +305,7 @@ def write_to_csv(data, flightnr):
     time = time.replace(":", "_")
     time = time.replace(" ", "_")
 
-    filename = f"flight{flightnr}_IDSminus1h_interpol_only_time.csv"
+    filename = f"flight{flightnr}_IDSminus1h_IDW_interpol_plus_time.csv"
 
     filedir = os.path.join(parentdir, "IDSdata")
     os.chdir(filedir)
@@ -323,31 +320,6 @@ def write_to_csv(data, flightnr):
         writer.writerows(data)
 
     print(f"flight{flightnr} saved into csv")
-    os.chdir(parentdir)
-
-
-###############################################
-# Write coords of nearests to a csv-file      #
-###############################################
-
-def write_coords_to_csv(data, flightnr, i):
-    header = ["Latitude", "Longitude", "Altitude"]
-
-    filename = f"flight{flightnr}_nearest_coords_{i}.csv"
-
-    filedir = os.path.join(parentdir, "IDSdata")
-    os.chdir(filedir)
-
-    with open(filename, 'w', encoding='UTF8', newline='') as f:
-        writer = csv.writer(f, delimiter=",")
-
-        # write the header
-        writer.writerow(header)
-
-        # write multiple rows
-        writer.writerows(data)
-
-    print(f"coordinates {i} for flight{flightnr} saved into csv")
     os.chdir(parentdir)
 
 
@@ -380,6 +352,8 @@ def main(flightrows, flightnr):
     D2_HHLs, EU_HHLs = download_HHL()
 
     variables_of_interest = ["t", "p", "qv", "u", "v", "w"]
+    # This next line is only for speeding up validation, where qv is not needed
+    variables_of_interest = ["t", "p", "u", "v", "w"]
 
     """
     Insert here the points of interest, format: latitude, longitude, altitude in meters abv sealevel.
@@ -390,10 +364,6 @@ def main(flightrows, flightnr):
     points_in_space = read_from_txt(flightrows)
 
     csvdata = []
-    coords1_csvdata = []
-    coords2_csvdata = []
-    coords3_csvdata = []
-    coords4_csvdata = []
 
     global parentdir
     parentdir = os.getcwd()
@@ -429,7 +399,7 @@ def main(flightrows, flightnr):
             ICON_switcher = "EU"
 
         # lat,lon,alt,index,lvl describe the actual point. All lists starting with grid... describe the grid points
-        griddistances, gridindices, coordinates = get_index_from_gribfile(f"{ICON_switcher}_HHL_level_1.grib2", lat, lon)
+        griddistances, gridindices = get_index_from_gribfile(f"{ICON_switcher}_HHL_level_1.grib2", lat, lon)
         index = gridindices[0]
 
         if ICON_switcher == "D2":
@@ -438,11 +408,11 @@ def main(flightrows, flightnr):
             lvl, level_list, alt_list = get_modellevel_from_altitude(EU_HHLs, index, alt)
 
         # WARNING: this next line is for horizontal interpolation only and will delete any vertical interpolation
-        level_list.pop(1)
+        # level_list.pop(1)
         # WARNING: this next lines are for vertical interpolation only and will delete any horizontal interpolation
-        gridindices.pop(1)
-        gridindices.pop(1)
-        gridindices.pop(1)
+        # gridindices.pop(1)
+        # gridindices.pop(1)
+        # gridindices.pop(1)
 
         """
         gridalts = []
@@ -455,10 +425,6 @@ def main(flightrows, flightnr):
         # print("Point:", point, "// Model taken:", ICON_switcher, "// Level:", lvl)
 
         csvrow = [lat, lon, alt, time_at_point, exactGMT, lvl]
-        coords1_csvrow = [coordinates[0], coordinates[1], alt]
-        coords2_csvrow = [coordinates[2], coordinates[3], alt]
-        coords3_csvrow = [coordinates[4], coordinates[5], alt]
-        coords4_csvrow = [coordinates[6], coordinates[7], alt]
 
         for var in variables_of_interest:
 
@@ -523,6 +489,7 @@ def main(flightrows, flightnr):
                                 value_list.append(read_value_from_gribfile(filename, gridindex))
                             os.chdir(parentdir)
 
+                # old interpolation method with pythagoras:
                 """
                 # calculate actual distances from grid-distances and alts using pythagoras
                 act_distances = []
@@ -538,6 +505,7 @@ def main(flightrows, flightnr):
                     nominator += (value_list[i] / act_distances[i])
                     denominator += (1 / act_distances[i])
                 value = nominator / denominator                
+                """
 
                 # Interpolating values using "inverted distance weighting IDW" on both levels first
                 nominator = 0
@@ -545,7 +513,7 @@ def main(flightrows, flightnr):
                 for i in range(len(griddistances)):
                     nominator += (value_list[i] / griddistances[i])
                     denominator += (1 / griddistances[i])
-                value = nominator / denominator
+                value_alt1 = nominator / denominator
 
                 nominator = 0
                 denominator = 0
@@ -553,16 +521,16 @@ def main(flightrows, flightnr):
                     nominator += (value_list[i+4] / griddistances[i])
                     denominator += (1 / griddistances[i])
                 value_alt2 = nominator / denominator
-                
+
                 # for only vertical interpolation (and possibly time)
-                value_alt1 = value_list[0]
-                value_alt2 = value_list[1]
+                # value_alt1 = value_list[0]
+                # value_alt2 = value_list[1]
 
                 # Another IDW between the levels for vertical interpolation
                 value = ((value_alt1/abs(alt_list[0]-alt) + value_alt2/abs(alt_list[1]-alt)) / (1/abs(alt_list[0]-alt) + 1/abs(alt_list[1]-alt)))
-                """
+
                 # for only time interpolation
-                value = value_list[0]
+                # value = value_list[0]
 
                 # for Time interpolation
                 value_time_list.append(value)
@@ -576,21 +544,13 @@ def main(flightrows, flightnr):
             denominator += (1 / ((60 - time_at_point.minute) / 60))
             value = nominator / denominator
 
-            #print(f"{var} = ", value, ", interpolated from list: ", value_list, "and then timelist: ", value_time_list)
+            # print(f"{var} =  {value} , interpolated from timelist: {value_time_list}")
 
             csvrow.append(value)
 
         csvdata.append(csvrow)
-        coords1_csvdata.append(coords1_csvrow)
-        coords2_csvdata.append(coords2_csvrow)
-        coords3_csvdata.append(coords3_csvrow)
-        coords4_csvdata.append(coords4_csvrow)
 
     write_to_csv(csvdata, flightnr)
-    # write_coords_to_csv(coords1_csvdata, flightnr, 1)
-    # write_coords_to_csv(coords2_csvdata, flightnr, 2)
-    # write_coords_to_csv(coords3_csvdata, flightnr, 3)
-    # write_coords_to_csv(coords4_csvdata, flightnr, 4)
 
 
 #################################
