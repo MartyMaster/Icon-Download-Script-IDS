@@ -306,9 +306,9 @@ def write_to_csv(data, flightnr):
     time = str(time.replace(microsecond=0))
     time = time.replace("-", "_")
     time = time.replace(":", "_")
-    time = time.replace(" ","_")
+    time = time.replace(" ", "_")
 
-    filename = f"flight{flightnr}_IDSminus1h_interpol_lvl_and_time.csv"
+    filename = f"flight{flightnr}_IDSminus1h_interpol_only_time.csv"
 
     filedir = os.path.join(parentdir, "IDSdata")
     os.chdir(filedir)
@@ -437,9 +437,9 @@ def main(flightrows, flightnr):
         else:
             lvl, level_list, alt_list = get_modellevel_from_altitude(EU_HHLs, index, alt)
 
-        # WARNING: this next line is only for horizontal interpolation and will delete any vertical interpolation
-        # level_list.pop(1)
-        # WARNING: this next lines are only for vertical interpolation and will delete any horizontal interpolation
+        # WARNING: this next line is for horizontal interpolation only and will delete any vertical interpolation
+        level_list.pop(1)
+        # WARNING: this next lines are for vertical interpolation only and will delete any horizontal interpolation
         gridindices.pop(1)
         gridindices.pop(1)
         gridindices.pop(1)
@@ -553,13 +553,16 @@ def main(flightrows, flightnr):
                     nominator += (value_list[i+4] / griddistances[i])
                     denominator += (1 / griddistances[i])
                 value_alt2 = nominator / denominator
-                """
+                
+                # for only vertical interpolation (and possibly time)
                 value_alt1 = value_list[0]
                 value_alt2 = value_list[1]
 
-                # Another IDW between the levels
+                # Another IDW between the levels for vertical interpolation
                 value = ((value_alt1/abs(alt_list[0]-alt) + value_alt2/abs(alt_list[1]-alt)) / (1/abs(alt_list[0]-alt) + 1/abs(alt_list[1]-alt)))
-
+                """
+                # for only time interpolation
+                value = value_list[0]
 
                 # for Time interpolation
                 value_time_list.append(value)
