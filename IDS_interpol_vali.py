@@ -621,7 +621,7 @@ def main_looper():
     for i in range(4):
         file = pd.read_csv(f"20221116_data_export_Martin_Jansen_ZHAW_{i+2}.txt", sep="\t", header=0)
         print("File", i+2)
-        file = pd.read_csv(f"20221116_data_export_Martin_Jansen_ZHAW_5.txt", sep="\t", header=0)
+        # file = pd.read_csv(f"20221116_data_export_Martin_Jansen_ZHAW_5.txt", sep="\t", header=0)
 
         flightlist = []
         for flightnr in file["Flight Record"]:
