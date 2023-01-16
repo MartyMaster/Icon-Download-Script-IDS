@@ -309,7 +309,7 @@ def write_to_csv(data, flightnr):
     time = time.replace(":", "_")
     time = time.replace(" ", "_")
 
-    filename = f"flight{flightnr}_IDSminus1h_IDW_full_interpol_less_than_50m.csv"
+    filename = f"flight{flightnr}_IDSminus1h_EU_IDW_full_interpol.csv"
 
     filedir = os.path.join(parentdir, "IDSdata")
     os.chdir(filedir)
@@ -376,6 +376,8 @@ def main(flightrows, flightnr):
 
         global ICON_switcher
         ICON_switcher = "D2"
+        #for validation only EU
+        ICON_switcher = "EU"
 
         # Decode point-tuples into their parameters:
         lat, lon, alt, exactGMT = point[0], point[1], point[2], point[8]
@@ -432,7 +434,7 @@ def main(flightrows, flightnr):
 
         # following lines are for debugging of the new interpol only, they will mess up old interpol with pythagoras
         gridalts.sort()
-        if abs(gridalts[0] - gridalts[3]) < 50:
+        if abs(gridalts[0] - gridalts[3]) < 5000: # set back to 50 or whatever there is to be used
 
             csvrow = [lat, lon, alt, time_at_point, exactGMT, lvl]
 
