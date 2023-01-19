@@ -301,7 +301,7 @@ def read_value_from_gribfile(file, index):
 def write_to_csv(data, flightnr):
     header = ["Latitude", "Longitude", "geometric Altitude (m)", "UTC", "exactGMT", "Level", "t", "p", "qv", "u", "v", "w"]
     # This next line is only for speeding up validation, where qv and w are not needed. Be sure to adjust in main()
-    header = ["Latitude", "Longitude", "geometric Altitude (m)", "UTC", "exactGMT", "Level", "t", "p", "u", "v"]
+    # header = ["Latitude", "Longitude", "geometric Altitude (m)", "UTC", "exactGMT", "Level", "t", "p", "u", "v"]
 
     time = datetime.utcnow()
     time = str(time.replace(microsecond=0))
@@ -357,7 +357,7 @@ def main(flightrows, flightnr):
 
     variables_of_interest = ["t", "p", "qv", "u", "v", "w"]
     # This next line is only for speeding up validation, where qv and w are not needed. Be sure to adjust in write_to_csv()
-    variables_of_interest = ["t", "p", "u", "v"]
+    # variables_of_interest = ["t", "p", "u", "v"]
 
     """
     Insert here the points of interest, format: latitude, longitude, altitude in meters abv sealevel.
@@ -376,8 +376,8 @@ def main(flightrows, flightnr):
 
         global ICON_switcher
         ICON_switcher = "D2"
-        #for validation only EU
-        ICON_switcher = "EU"
+        # for validation only EU
+        # ICON_switcher = "EU"
 
         # Decode point-tuples into their parameters:
         lat, lon, alt, exactGMT = point[0], point[1], point[2], point[8]
@@ -420,7 +420,7 @@ def main(flightrows, flightnr):
         # gridindices.pop(1)
         # gridindices.pop(1)
         # WARNING: this next line  will delete any time interpolation
-        time_at_point_list.pop(1)
+        # time_at_point_list.pop(1)
 
 
         gridalts = []
@@ -433,138 +433,138 @@ def main(flightrows, flightnr):
         # print("Point:", point, "// Model taken:", ICON_switcher, "// Level:", lvl, "Gridalts:", gridalts)
 
         # following lines are for debugging of the new interpol only, they will mess up old interpol with pythagoras
-        gridalts.sort()
-        if abs(gridalts[0] - gridalts[3]) < 50: # set back to 50 or whatever there is to be used
+        #gridalts.sort()
+        # if abs(gridalts[0] - gridalts[3]) < 50: # set back to 50 or whatever there is to be used
 
-            csvrow = [lat, lon, alt, time_at_point, exactGMT, lvl]
+        csvrow = [lat, lon, alt, time_at_point, exactGMT, lvl]
 
-            for var in variables_of_interest:
+        for var in variables_of_interest:
 
-                os.chdir(parentdir)
+            os.chdir(parentdir)
 
-                value_time_list = []
+            value_time_list = []
 
-                for time_at in time_at_point_list:
+            for time_at in time_at_point_list:
 
-                    value_list = []
+                value_list = []
 
-                    for level in level_list:
+                for level in level_list:
 
-                        global oldermodel                       # used if latest model is not yet available
-                        oldermodel = False
+                    global oldermodel                       # used if latest model is not yet available
+                    oldermodel = False
 
-                        try:                                                       # check if file is already present
+                    try:                                                       # check if file is already present
+                        filename, day, hour = build_url(level, var, time_at)[1:4]
+                        subdir = day + "_" + hour
+                        filedir = os.path.join(parentdir, subdir)
+                        os.chdir(filedir)
+                        try:
+                            unzip_file(filename)
+                        except:
+                            pass
+                        filename = filename[:-4]
+                        for gridindex in gridindices:
+                            value_list.append(read_value_from_gribfile(filename, gridindex))
+                        os.chdir(parentdir)
+
+                    except:                                                # if not, check if file of older model is present
+                        try:
+                            oldermodel = True
+
+                            os.chdir(parentdir)
                             filename, day, hour = build_url(level, var, time_at)[1:4]
+                            filename = filename[:-4]
                             subdir = day + "_" + hour
                             filedir = os.path.join(parentdir, subdir)
                             os.chdir(filedir)
-                            try:
-                                unzip_file(filename)
-                            except:
-                                pass
-                            filename = filename[:-4]
                             for gridindex in gridindices:
                                 value_list.append(read_value_from_gribfile(filename, gridindex))
                             os.chdir(parentdir)
 
-                        except:                                                # if not, check if file of older model is present
+                        except:                                                # if both files are not yet present, download
+                            oldermodel = False
+
+                            os.chdir(parentdir)
+                            filename, day, hour = build_url(level, var, time_at)[1:4]
+                            filename = filename[:-4]
+                            subdir = day + "_" + hour
+                            filedir = os.path.join(parentdir, subdir)
+
                             try:
-                                oldermodel = True
+                                os.mkdir(filedir, mode=0o777)
+                            except:
+                                pass
 
-                                os.chdir(parentdir)
-                                filename, day, hour = build_url(level, var, time_at)[1:4]
-                                filename = filename[:-4]
-                                subdir = day + "_" + hour
-                                filedir = os.path.join(parentdir, subdir)
-                                os.chdir(filedir)
-                                for gridindex in gridindices:
-                                    value_list.append(read_value_from_gribfile(filename, gridindex))
-                                os.chdir(parentdir)
+                            os.chdir(filedir)
+                            download(level, var, time_at)
+                            for gridindex in gridindices:
+                                value_list.append(read_value_from_gribfile(filename, gridindex))
+                            os.chdir(parentdir)
 
-                            except:                                                # if both files are not yet present, download
-                                oldermodel = False
-
-                                os.chdir(parentdir)
-                                filename, day, hour = build_url(level, var, time_at)[1:4]
-                                filename = filename[:-4]
-                                subdir = day + "_" + hour
-                                filedir = os.path.join(parentdir, subdir)
-
-                                try:
-                                    os.mkdir(filedir, mode=0o777)
-                                except:
-                                    pass
-
-                                os.chdir(filedir)
-                                download(level, var, time_at)
-                                for gridindex in gridindices:
-                                    value_list.append(read_value_from_gribfile(filename, gridindex))
-                                os.chdir(parentdir)
-
-                    # old interpolation method with pythagoras:
-                    """
-                    # calculate actual distances from grid-distances and alts using pythagoras
-                    act_distances = []
-                    for i in range(len(griddistances)):
-                        act_distances.append(math.sqrt((griddistances[i] * 1000) ** 2 + (gridalts[i] - alt) ** 2))
-                    for i in range(len(griddistances)):
-                        act_distances.append(math.sqrt((griddistances[i] * 1000) ** 2 + (gridalts[i+4] - alt) ** 2))
-        
-                    # interpolate value using "inverted distance weighting IDW"
-                    nominator = 0
-                    denominator = 0
-                    for i in range(len(value_list)):
-                        nominator += (value_list[i] / act_distances[i])
-                        denominator += (1 / act_distances[i])
-                    value = nominator / denominator                
-                    """
-
-                    # Interpolating values using "inverted distance weighting IDW" on both levels first
-                    nominator = 0
-                    denominator = 0
-                    for i in range(len(griddistances)):
-                        nominator += (value_list[i] / griddistances[i])
-                        denominator += (1 / griddistances[i])
-                    value_alt1 = nominator / denominator
-
-                    # for only horizontal interpolation
-                    # value = value_alt1
-
-
-                    nominator = 0
-                    denominator = 0
-                    for i in range(len(griddistances)):
-                        nominator += (value_list[i+4] / griddistances[i])
-                        denominator += (1 / griddistances[i])
-                    value_alt2 = nominator / denominator
-    
-                    # for only vertical interpolation (and possibly time)
-                    # value_alt1 = value_list[0]
-                    # value_alt2 = value_list[1]
-    
-                    # Another IDW between the levels for vertical interpolation
-                    value = ((value_alt1/abs(alt_list[0]-alt) + value_alt2/abs(alt_list[1]-alt)) / (1/abs(alt_list[0]-alt) + 1/abs(alt_list[1]-alt)))
-    
-                    # for only time interpolation
-                    # value = value_list[0]
-                    
-                    # for Time interpolation
-                    # value_time_list.append(value)
+                # old interpolation method with pythagoras:
                 """
-                # Time interolation: weighting is 1/(minutes away from full hour)
+                # calculate actual distances from grid-distances and alts using pythagoras
+                act_distances = []
+                for i in range(len(griddistances)):
+                    act_distances.append(math.sqrt((griddistances[i] * 1000) ** 2 + (gridalts[i] - alt) ** 2))
+                for i in range(len(griddistances)):
+                    act_distances.append(math.sqrt((griddistances[i] * 1000) ** 2 + (gridalts[i+4] - alt) ** 2))
+    
+                # interpolate value using "inverted distance weighting IDW"
                 nominator = 0
                 denominator = 0
-                nominator += (value_time_list[0] / ((60 - time_at_point.minute) / 60))
-                nominator += (value_time_list[1] / ((time_at_point.minute + 0.001) / 60))   # +0.001 to avoid division by zero
-                denominator += (1 / ((time_at_point.minute + 0.001) / 60))
-                denominator += (1 / ((60 - time_at_point.minute) / 60))
-                value = nominator / denominator
+                for i in range(len(value_list)):
+                    nominator += (value_list[i] / act_distances[i])
+                    denominator += (1 / act_distances[i])
+                value = nominator / denominator                
                 """
-                # print(f"{var} =  {value} , interpolated from timelist: {value_time_list}")
 
-                csvrow.append(value)
+                # Interpolating values using "inverted distance weighting IDW" on both levels first
+                nominator = 0
+                denominator = 0
+                for i in range(len(griddistances)):
+                    nominator += (value_list[i] / griddistances[i])
+                    denominator += (1 / griddistances[i])
+                value_alt1 = nominator / denominator
 
-            csvdata.append(csvrow)
+                # for only horizontal interpolation
+                # value = value_alt1
+
+
+                nominator = 0
+                denominator = 0
+                for i in range(len(griddistances)):
+                    nominator += (value_list[i+4] / griddistances[i])
+                    denominator += (1 / griddistances[i])
+                value_alt2 = nominator / denominator
+
+                # for only vertical interpolation (and possibly time)
+                # value_alt1 = value_list[0]
+                # value_alt2 = value_list[1]
+
+                # Another IDW between the levels for vertical interpolation
+                value = ((value_alt1/abs(alt_list[0]-alt) + value_alt2/abs(alt_list[1]-alt)) / (1/abs(alt_list[0]-alt) + 1/abs(alt_list[1]-alt)))
+
+                # for only time interpolation
+                # value = value_list[0]
+
+                # for Time interpolation
+                value_time_list.append(value)
+
+            # Time interolation: weighting is 1/(minutes away from full hour)
+            nominator = 0
+            denominator = 0
+            nominator += (value_time_list[0] / ((60 - time_at_point.minute) / 60))
+            nominator += (value_time_list[1] / ((time_at_point.minute + 0.001) / 60))   # +0.001 to avoid division by zero
+            denominator += (1 / ((time_at_point.minute + 0.001) / 60))
+            denominator += (1 / ((60 - time_at_point.minute) / 60))
+            value = nominator / denominator
+
+            # print(f"{var} =  {value} , interpolated from timelist: {value_time_list}")
+
+            csvrow.append(value)
+
+        csvdata.append(csvrow)
 
     write_to_csv(csvdata, flightnr)
 
@@ -620,21 +620,30 @@ def read_from_txt(flightrows):
 def main_looper():
     starttime = datetime.utcnow()
 
-    for i in range(4):
+    for i in range(1):
         file = pd.read_csv(f"20221116_data_export_Martin_Jansen_ZHAW_{i+2}.txt", sep="\t", header=0)
         print("File", i+2)
-        # file = pd.read_csv(f"20221116_data_export_Martin_Jansen_ZHAW_5.txt", sep="\t", header=0)
+        file = pd.read_csv(f"20221116_data_export_Martin_Jansen_ZHAW_2.txt", sep="\t", header=0)
 
         flightlist = []
         for flightnr in file["Flight Record"]:
             if flightnr not in flightlist:
                 flightlist.append(flightnr)
 
+        i = 0
+        timer = []
         for flightnr in flightlist:
+            starttime_point = datetime.utcnow()
+            i+=1
+            print(flightnr)
             flightrows = file.loc[file["Flight Record"] == flightnr]
             main(flightrows, flightnr)
+            endtime_point = datetime.utcnow()
+            timer.append(endtime_point-starttime_point)
 
-    print(f"IDS finished at {datetime.utcnow()}, start time was {starttime}")
+        avg = pd.to_timedelta(pd.Series(timer)).mean()
+
+    print(f"IDS started at {starttime}, finished at {datetime.utcnow()}. Full interpol for {i} flights, avg time per flight: {avg}")
 
 
 if __name__ == '__main__':
