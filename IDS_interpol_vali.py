@@ -309,7 +309,7 @@ def write_to_csv(data, flightnr):
     time = time.replace(":", "_")
     time = time.replace(" ", "_")
 
-    filename = f"flight{flightnr}_IDSminus1h_EU_IDW_full_interpol_less_than_50m.csv"
+    filename = f"flight{flightnr}_IDSminus1h_IDW_full_interpol_plus_time.csv"
 
     filedir = os.path.join(parentdir, "IDSdata")
     os.chdir(filedir)
@@ -643,7 +643,7 @@ def main_looper():
 
         avg = pd.to_timedelta(pd.Series(timer)).mean()
 
-    print(f"IDS started at {starttime}, finished at {datetime.utcnow()}. Full interpol for {i} flights, avg time per flight: {avg}")
+    print(f"IDS started at {starttime}, finished at {datetime.utcnow()}. Full interpol plus time for {i} flights, avg time per flight: {avg}")
 
 
 if __name__ == '__main__':
