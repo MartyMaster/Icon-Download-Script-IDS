@@ -309,7 +309,7 @@ def write_to_csv(data, flightnr):
     time = time.replace(":", "_")
     time = time.replace(" ", "_")
 
-    filename = f"flight{flightnr}_IDSminus1h_IDW_full_interpol_plus_time.csv"
+    filename = f"flight{flightnr}_IDSminus1h_IDW_full_interpol.csv"
 
     filedir = os.path.join(parentdir, "IDSdata")
     os.chdir(filedir)
@@ -323,7 +323,7 @@ def write_to_csv(data, flightnr):
         # write multiple rows
         writer.writerows(data)
 
-    print(f"flight{flightnr} saved into csv")
+    # print(f"flight{flightnr} saved into csv")
     os.chdir(parentdir)
 
 
@@ -420,7 +420,7 @@ def main(flightrows, flightnr):
         # gridindices.pop(1)
         # gridindices.pop(1)
         # WARNING: this next line  will delete any time interpolation
-        # time_at_point_list.pop(1)
+        time_at_point_list.pop(1)
 
 
         gridalts = []
@@ -549,8 +549,8 @@ def main(flightrows, flightnr):
                 # value = value_list[0]
 
                 # for Time interpolation
-                value_time_list.append(value)
-
+                # value_time_list.append(value)
+            """
             # Time interolation: weighting is 1/(minutes away from full hour)
             nominator = 0
             denominator = 0
@@ -559,7 +559,7 @@ def main(flightrows, flightnr):
             denominator += (1 / ((time_at_point.minute + 0.001) / 60))
             denominator += (1 / ((60 - time_at_point.minute) / 60))
             value = nominator / denominator
-
+            """
             # print(f"{var} =  {value} , interpolated from timelist: {value_time_list}")
 
             csvrow.append(value)
@@ -622,7 +622,6 @@ def main_looper():
 
     for i in range(1):
         file = pd.read_csv(f"20221116_data_export_Martin_Jansen_ZHAW_{i+2}.txt", sep="\t", header=0)
-        print("File", i+2)
         file = pd.read_csv(f"20221116_data_export_Martin_Jansen_ZHAW_2.txt", sep="\t", header=0)
 
         flightlist = []
@@ -630,12 +629,14 @@ def main_looper():
             if flightnr not in flightlist:
                 flightlist.append(flightnr)
 
+        # flightlist = [3091291]
+
         i = 0
         timer = []
         for flightnr in flightlist:
             starttime_point = datetime.utcnow()
-            i+=1
-            print(flightnr)
+            i += 1
+            # print(flightnr)
             flightrows = file.loc[file["Flight Record"] == flightnr]
             main(flightrows, flightnr)
             endtime_point = datetime.utcnow()
@@ -643,7 +644,8 @@ def main_looper():
 
         avg = pd.to_timedelta(pd.Series(timer)).mean()
 
-    print(f"IDS started at {starttime}, finished at {datetime.utcnow()}. Full interpol plus time for {i} flights, avg time per flight: {avg}")
+    print(f"IDS started at {starttime}, finished at {datetime.utcnow()}.\n"
+          f"Full interpol for {i} flights, avg time per flight: {avg}")
 
 
 if __name__ == '__main__':
