@@ -309,7 +309,7 @@ def write_to_csv(data, flightnr):
     time = time.replace(":", "_")
     time = time.replace(" ", "_")
 
-    filename = f"flight{flightnr}_IDSminus1h_IDW_full_interpol.csv"
+    filename = f"flight{flightnr}_IDSminus1h_IDW_vertical_interpol.csv"
 
     filedir = os.path.join(parentdir, "IDSdata")
     os.chdir(filedir)
@@ -416,20 +416,20 @@ def main(flightrows, flightnr):
         # WARNING: this next line is for horizontal interpolation only and will delete any vertical interpolation
         # level_list.pop(1)
         # WARNING: this next lines are for vertical interpolation only and will delete any horizontal interpolation
-        # gridindices.pop(1)
-        # gridindices.pop(1)
-        # gridindices.pop(1)
+        gridindices.pop(1)
+        gridindices.pop(1)
+        gridindices.pop(1)
         # WARNING: this next line  will delete any time interpolation
         time_at_point_list.pop(1)
 
-
+        """
         gridalts = []
         for gridlevel in level_list:
             for gridindex in gridindices:                                   # calculate alt of full levels from HHLs
                 gridalt1 = read_value_from_gribfile(f"{ICON_switcher}_HHL_level_{gridlevel}.grib2", gridindex)
                 gridalt2 = read_value_from_gribfile(f"{ICON_switcher}_HHL_level_{gridlevel + 1}.grib2", gridindex)
                 gridalts.append((gridalt1 + gridalt2)/2)
-
+        """
         # print("Point:", point, "// Model taken:", ICON_switcher, "// Level:", lvl, "Gridalts:", gridalts)
 
         # following lines are for debugging of the new interpol only, they will mess up old interpol with pythagoras
@@ -517,7 +517,7 @@ def main(flightrows, flightnr):
                     nominator += (value_list[i] / act_distances[i])
                     denominator += (1 / act_distances[i])
                 value = nominator / denominator                
-                """
+                
 
                 # Interpolating values using "inverted distance weighting IDW" on both levels first
                 nominator = 0
@@ -537,10 +537,10 @@ def main(flightrows, flightnr):
                     nominator += (value_list[i+4] / griddistances[i])
                     denominator += (1 / griddistances[i])
                 value_alt2 = nominator / denominator
-
+                """
                 # for only vertical interpolation (and possibly time)
-                # value_alt1 = value_list[0]
-                # value_alt2 = value_list[1]
+                value_alt1 = value_list[0]
+                value_alt2 = value_list[1]
 
                 # Another IDW between the levels for vertical interpolation
                 value = ((value_alt1/abs(alt_list[0]-alt) + value_alt2/abs(alt_list[1]-alt)) / (1/abs(alt_list[0]-alt) + 1/abs(alt_list[1]-alt)))
@@ -560,7 +560,7 @@ def main(flightrows, flightnr):
             denominator += (1 / ((60 - time_at_point.minute) / 60))
             value = nominator / denominator
             """
-            # print(f"{var} =  {value} , interpolated from timelist: {value_time_list}")
+            # print(f"{var} =  {value} , interpolated from valuelist: {value_list}")
 
             csvrow.append(value)
 
@@ -645,7 +645,7 @@ def main_looper():
         avg = pd.to_timedelta(pd.Series(timer)).mean()
 
     print(f"IDS started at {starttime}, finished at {datetime.utcnow()}.\n"
-          f"Full interpol for {i} flights, avg time per flight: {avg}")
+          f"Time interpol for {i} flights, avg time per flight: {avg}")
 
 
 if __name__ == '__main__':
