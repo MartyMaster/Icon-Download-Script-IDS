@@ -309,7 +309,7 @@ def write_to_csv(data, flightnr):
     time = time.replace(":", "_")
     time = time.replace(" ", "_")
 
-    filename = f"flight{flightnr}_IDSminus1h_time_interpol.csv"
+    filename = f"flight{flightnr}_IDSminus1h_vertical_interpol.csv"
 
     filedir = os.path.join(parentdir, "IDSdata")
     os.chdir(filedir)
@@ -414,13 +414,13 @@ def main(flightrows, flightnr):
             lvl, level_list, alt_list = get_modellevel_from_altitude(EU_HHLs, index, alt)
 
         # WARNING: this next line is for horizontal interpolation only and will delete any vertical interpolation
-        level_list.pop(1)
+        # level_list.pop(1)
         # WARNING: this next lines are for vertical interpolation only and will delete any horizontal interpolation
         gridindices.pop(1)
         gridindices.pop(1)
         gridindices.pop(1)
         # WARNING: this next line  will delete any time interpolation
-        # time_at_point_list.pop(1)
+        time_at_point_list.pop(1)
 
         """
         gridalts = []
@@ -537,7 +537,7 @@ def main(flightrows, flightnr):
                     nominator += (value_list[i+4] / griddistances[i])
                     denominator += (1 / griddistances[i])
                 value_alt2 = nominator / denominator
-                
+                """
                 # for only vertical interpolation (and possibly time)
                 value_alt1 = value_list[0]
                 value_alt2 = value_list[1]
@@ -546,10 +546,10 @@ def main(flightrows, flightnr):
                 value = ((value_alt1/abs(alt_list[0]-alt) + value_alt2/abs(alt_list[1]-alt)) / (1/abs(alt_list[0]-alt) + 1/abs(alt_list[1]-alt)))
                 """
                 # for only time interpolation
-                value = value_list[0]
+                # value = value_list[0]
 
                 # for Time interpolation
-                value_time_list.append(value)
+                #value_time_list.append(value)
             
             # Time interolation: weighting is 1/(minutes away from full hour)
             nominator = 0
@@ -559,7 +559,7 @@ def main(flightrows, flightnr):
             denominator += (1 / ((time_at_point.minute + 0.001) / 60))
             denominator += (1 / ((60 - time_at_point.minute) / 60))
             value = nominator / denominator
-
+            """
             # value = value_list[0]
             # print(f"{var} =  {value} , interpolated from valuelist: {value_list}")
 
@@ -646,7 +646,7 @@ def main_looper():
         avg = pd.to_timedelta(pd.Series(timer)).mean()
 
     print(f"IDS started at {starttime}, finished at {datetime.utcnow()}.\n"
-          f"Time interpol for {i} flights, avg time per flight: {avg}")
+          f"Vertical interpol for {i} flights, avg time per flight: {avg}")
 
 
 if __name__ == '__main__':
