@@ -27,8 +27,8 @@ def download_HHL():
 
     if HHL_counter <= 126:
 
-        global oldermodel                  # HHL is time-invariant, so it's not necessary to check whether the latest model
-        oldermodel = True                  # is available. It's easier to just download an older file.
+        global oldermodel               # HHL is time-invariant, so it's not necessary to check whether the latest model
+        oldermodel = True               # is available. It's easier to just download an older file.
 
         rounded_time = round_down_time(0)
 
@@ -48,6 +48,9 @@ def download_HHL():
             urllib.request.urlretrieve(url, f"EU_HHL_level_{i}.grib2.bz2")
             unzip_file(f"EU_HHL_level_{i}.grib2.bz2")
             i += 1
+
+    # All HHL files are stored in a list per model, which can be accessed everytime a level is needed.
+    # This gives better performance than opening all HHL files for every point.
 
     D2_HHls = []
     EU_HHLs = []
@@ -81,14 +84,17 @@ def get_index_from_gribfile(file, lat, lon):
 
     distances = []
     indices = []
+
     for pt in nearest:
         distances.append(pt.distance)
         indices.append(pt.index)
 
+    # sorting the nearest-list to: from nearest to furthest point
     nearest = sorted(zip(distances, indices))
 
     distances = []
     indices = []
+
     for pt in nearest:
         distances.append(pt[0])
         indices.append(pt[1])
@@ -278,6 +284,7 @@ def read_value_from_gribfile(file, index):
 
     return value[index]
 
+
 #################################
 #      Write to a csv-file      #
 #################################
@@ -355,6 +362,13 @@ def main():
             time_at_point = datetime.utcnow()
             print("Current time taken")
 
+        # Creating time list for temporal interpolation
+        if time_at_point.minute >= 30:
+            time_at_point2 = time_at_point - timedelta(minutes=30)
+        else:
+            time_at_point2 = time_at_point + timedelta(minutes=30)
+        time_at_point_list = [time_at_point, time_at_point2]
+
         # Check if coordinates are within ICON-D2 range. Otherwise use ICON-EU
         if 44 <= lat <= 50:
             if not 0 <= lon <= 17:
@@ -374,62 +388,98 @@ def main():
         else:
             lvl, level_list, alt_list = get_modellevel_from_altitude(EU_HHLs, index, alt)
 
-        gridalts = []
-        for gridlevel in level_list:
-            for gridindex in gridindices:                                   # calculate alt of full levels from HHLs
-                gridalt1 = read_value_from_gribfile(f"{ICON_switcher}_HHL_level_{gridlevel}.grib2", gridindex)
-                gridalt2 = read_value_from_gribfile(f"{ICON_switcher}_HHL_level_{gridlevel + 1}.grib2", gridindex)
-                gridalts.append((gridalt1 + gridalt2)/2)
+        # WARNING: this next line will delete any vertical interpolation, calculation below needs to be adapted too
+        # level_list.pop(1)
+        # WARNING: these next lines will delete any horizontal interpolation, calculation below needs to be adapted too
+        #gridindices.pop(1)
+        #gridindices.pop(1)
+        #gridindices.pop(1)
+        # WARNING: this next line  will delete any time interpolation, calculation below needs to be adapted too
+        #time_at_point_list.pop(1)
 
-        print("Point:", point, "// Model taken:", ICON_switcher, "// Level:", lvl)
+        # For debugging/information
+        # print("Point:", point, "// Model taken:", ICON_switcher, "// Level:", lvl)
 
         csvrow = [lat, lon, alt, time_at_point, lvl]
 
         for var in variables_of_interest:
 
-            value_list = []
+            value_time_list = []
 
-            for level in level_list:
+            for time_at in time_at_point_list:
 
-                global oldermodel                       # used if latest model is not yet available
-                oldermodel = False
+                value_list = []
 
-                try:                                                       # check if file is already present
-                    filename = build_url(level, var, time_at_point)[1][:-4]
-                    for gridindex in gridindices:
-                        value_list.append(read_value_from_gribfile(filename, gridindex))
+                for level in level_list:
 
-                except:                                               # if not, check if file of older model is present
-                    try:
-                        oldermodel = True
+                    global oldermodel                       # used if latest model is not yet available
+                    oldermodel = False
 
-                        filename = build_url(level, var, time_at_point)[1][:-4]
+                    try:                                                       # check if file is already present
+                        filename = build_url(level, var, time_at)[1][:-4]
                         for gridindex in gridindices:
                             value_list.append(read_value_from_gribfile(filename, gridindex))
 
-                    except:                                                # if both files are not yet present, download
-                        oldermodel = False
+                    except:                                            # if not, check if file of older model is present
+                        try:
+                            oldermodel = True
 
-                        download(level, var, time_at_point)
-                        filename = build_url(level, var, time_at_point)[1][:-4]
-                        for gridindex in gridindices:
-                            value_list.append(read_value_from_gribfile(filename, gridindex))
+                            filename = build_url(level, var, time_at)[1][:-4]
+                            for gridindex in gridindices:
+                                value_list.append(read_value_from_gribfile(filename, gridindex))
 
-            # calculate actual distances from grid-distances and alts using pythagoras
-            act_distances = []
-            for altitude in alt_list:
-                for dist in griddistances:
-                    act_distances.append(math.sqrt((dist*1000)**2 + (altitude-alt)**2))
+                        except:                                            # if both files are not yet present, download
+                            oldermodel = False
 
-            # interpolate value using "inverted distance weighting IDW"
+                            download(level, var, time_at)
+                            filename = build_url(level, var, time_at)[1][:-4]
+                            for gridindex in gridindices:
+                                value_list.append(read_value_from_gribfile(filename, gridindex))
+
+
+                # Interpolating values using "inverted distance weighting IDW" on both levels first
+                nominator = 0
+                denominator = 0
+                for i in range(len(griddistances)):
+                    nominator += (value_list[i] / griddistances[i])
+                    denominator += (1 / griddistances[i])
+                value_alt1 = nominator / denominator
+
+                # for horizontal-only interpolation, activate next line and deactivate all other IDW below
+                # value = value_alt1
+
+                nominator = 0
+                denominator = 0
+                for i in range(len(griddistances)):
+                    nominator += (value_list[i + 4] / griddistances[i])
+                    denominator += (1 / griddistances[i])
+                value_alt2 = nominator / denominator
+
+                # for vertical-only interpolation (and possibly time)
+                # value_alt1 = value_list[0]
+                # value_alt2 = value_list[1]
+
+                # Another IDW between the levels for vertical interpolation
+                value = ((value_alt1/abs(alt_list[0]-alt) + value_alt2/abs(alt_list[1]-alt)) /
+                         (1/abs(alt_list[0]-alt) + 1/abs(alt_list[1]-alt)))
+
+                # for time-only interpolation
+                # value = value_list[0]
+
+                # for Time interpolation
+                value_time_list.append(value)
+
+            # Time interolation: weighting is 1/(minutes away from full hour)
             nominator = 0
             denominator = 0
-            for i in range(len(value_list)):
-                nominator += (value_list[i] / act_distances[i])
-                denominator += (1 / act_distances[i])
+            nominator += (value_time_list[0] / ((60 - time_at_point.minute) / 60))
+            nominator += (value_time_list[1] / (
+                        (time_at_point.minute + 0.001) / 60))  # +0.001 to avoid division by zero
+            denominator += (1 / ((time_at_point.minute + 0.001) / 60))
+            denominator += (1 / ((60 - time_at_point.minute) / 60))
             value = nominator / denominator
 
-            print(f"{var} = ", value, ", interpolated from list: ", value_list)
+            print(f"{var} = {value}, interpolated from list: {value_list} and then time list: {value_time_list}")
 
             csvrow.append(value)
 
