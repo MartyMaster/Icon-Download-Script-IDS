@@ -299,8 +299,9 @@ def main():
     variables_of_interest = ["t", "p", "qv", "u", "v", "w"]
 
     """
-    Insert here the points of interest, format: latitude, longitude, altitude in meters abv sealevel.
-    Optional argument: time within the next 24h in UTC, format  YYYY, MM, DD, HH MM.
+    Insert here the points of interest, format: latitude, longitude, altitude in meters above sealevel.
+    Optional argument: time within the next 24h in UTC, format  YYYY, MM, DD, HH, MM.    
+    Alternatively, points can also be inserted with the points_simulator() function.
     """
     points_in_space = ((47.5642463503402, 8.0058731854457, 3115.711),)
     # points_in_space = points_simulator()
@@ -371,7 +372,7 @@ def main():
 
         csvdata.append(csvrow)
 
-    # write_to_csv(csvdata)
+    write_to_csv(csvdata)
 
 
 def points_simulator():
