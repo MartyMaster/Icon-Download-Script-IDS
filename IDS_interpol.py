@@ -340,8 +340,9 @@ def main():
     variables_of_interest = ["t", "p", "qv", "u", "v", "w"]
 
     """
-    Insert here the points of interest, format: latitude, longitude, altitude in meters abv sealevel.
-    Optional argument: time within the next 24h in UTC, format  YYYY, MM, DD, HH MM.
+    Insert here the points of interest, format: latitude, longitude, altitude in meters above sealevel.
+    Optional argument: time within the next 24h in UTC, format  YYYY, MM, DD, HH, MM.
+    Alternatively, points can also be inserted with the points_simulator() function.
     """
     points_in_space = ((47.5642463503402, 8.0058731854457, 0),)
     # points_in_space = points_simulator()
@@ -388,14 +389,14 @@ def main():
         else:
             lvl, level_list, alt_list = get_modellevel_from_altitude(EU_HHLs, index, alt)
 
-        # WARNING: this next line will delete any vertical interpolation, calculation below needs to be adapted too
+        # WARNING: this next line will delete any vertical interpolation, IDWs below need to be adapted too
         # level_list.pop(1)
-        # WARNING: these next lines will delete any horizontal interpolation, calculation below needs to be adapted too
-        #gridindices.pop(1)
-        #gridindices.pop(1)
-        #gridindices.pop(1)
-        # WARNING: this next line  will delete any time interpolation, calculation below needs to be adapted too
-        #time_at_point_list.pop(1)
+        # WARNING: these next 3 lines will delete any horizontal interpolation, IDWs below need to be adapted too
+        # gridindices.pop(1)
+        # gridindices.pop(1)
+        # gridindices.pop(1)
+        # WARNING: this next line  will delete any temporal interpolation, IDWs below need to be adapted too
+        # time_at_point_list.pop(1)
 
         # For debugging/information
         # print("Point:", point, "// Model taken:", ICON_switcher, "// Level:", lvl)
@@ -436,6 +437,7 @@ def main():
                             for gridindex in gridindices:
                                 value_list.append(read_value_from_gribfile(filename, gridindex))
 
+                # Start of sequence which needs to be adapted when using only selected interpolation methods
 
                 # Interpolating values using "inverted distance weighting IDW" on both levels first
                 nominator = 0
@@ -445,9 +447,10 @@ def main():
                     denominator += (1 / griddistances[i])
                 value_alt1 = nominator / denominator
 
-                # for horizontal-only interpolation, activate next line and deactivate all other IDW below
+                # if no vertical interpolation, activate next line and deactivate next IDW below
                 # value = value_alt1
 
+                # Another IDW for the second level
                 nominator = 0
                 denominator = 0
                 for i in range(len(griddistances)):
@@ -455,7 +458,7 @@ def main():
                     denominator += (1 / griddistances[i])
                 value_alt2 = nominator / denominator
 
-                # for vertical-only interpolation (and possibly time)
+                # if no horizontal interpolation, activate next 2 lines and deactivate the 2 IDWs above
                 # value_alt1 = value_list[0]
                 # value_alt2 = value_list[1]
 
@@ -463,13 +466,13 @@ def main():
                 value = ((value_alt1/abs(alt_list[0]-alt) + value_alt2/abs(alt_list[1]-alt)) /
                          (1/abs(alt_list[0]-alt) + 1/abs(alt_list[1]-alt)))
 
-                # for time-only interpolation
+                # if only temporal interpolation, activate next line and deactivate all IDW above
                 # value = value_list[0]
 
-                # for Time interpolation
+                # if no temporal interpolation, deactivate next line AND time-IDW below
                 value_time_list.append(value)
 
-            # Time interolation: weighting is 1/(minutes away from full hour)
+            # time-IDW for temporal interpolation: weighting is 1/(minutes away from full hour)
             nominator = 0
             denominator = 0
             nominator += (value_time_list[0] / ((60 - time_at_point.minute) / 60))
@@ -479,7 +482,10 @@ def main():
             denominator += (1 / ((60 - time_at_point.minute) / 60))
             value = nominator / denominator
 
-            print(f"{var} = {value}, interpolated from list: {value_list} and then time list: {value_time_list}")
+            # End of sequence which needs to be adapted when using only selected interpolation methods
+
+            # Optional print statement for validation/information...
+            # print(f"{var} = {value}, interpolated from list: {value_list} and then time list: {value_time_list}")
 
             csvrow.append(value)
 
